@@ -3,7 +3,6 @@ import numpy as np
 from pursuits import Pursuit, SklearnOrthogonalMatchingPursuit, OrthogonalMatchingPursuit
 
 
-
 class KSVD:
     """ Perform K-SVD algorithm to learn a dictionary from a set of signals Y as well as the sparse representation of Y using the dictionary ."""
     def __init__(self, n_atoms: int, sparsity: int, pursuit_method: Pursuit, verbose: bool = False) -> None:
@@ -46,12 +45,8 @@ class KSVD:
 
                 U, delta, Vh = np.linalg.svd(E_k @ omega_k, full_matrices=True)
 
-                d_k = U[:,0]
-                first_singular_value = delta[0] if len(delta.shape) > 0 else 1
-                x_k = first_singular_value * Vh[0,:]
-
-                self.dict[:,k] = d_k
-                self.coeffs[k,xk_T_nonzero_indexes] = x_k
+                self.dict[:,k] = U[:,0]
+                self.coeffs[k,xk_T_nonzero_indexes] = delta[0] * Vh[0,:] # first_singular_value = delta[0] if len(delta.shape) > 0 else 1
             
             residual = np.linalg.norm(y - self.dict @ self.coeffs)
             stopping_criterion = self.check_stopping_rule(residual, max_iter, tol)
@@ -74,7 +69,7 @@ class KSVD:
 
 if __name__ == "__main__":
 
-    from utils import SyntheticData
+    from synthetic_data import SyntheticData
 
     # create synthetic data
     data = SyntheticData(n_features=20)

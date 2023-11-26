@@ -1,80 +1,38 @@
+import os
+from pathlib import Path
 import numpy as np
+import matplotlib.pyplot as plt
 
 
-class SyntheticData:
+def plot_results_synthetic_exp(dir: str = None, n_runs: int = 50, success_threshold: float = 0.01):
+    """ Plot the results of the synthetic experiment over different noise levels. """
     
-    def __init__(self, n_features: int) -> None:
-        self.n_features = n_features
-        self.dict = None
-        self.coeffs = None
-        self.signals = None
+    noise_levels = [0, 10, 20, 30]
+    fig, ax = plt.subplots(figsize=(10, 5))
+
+    for noise_db in noise_levels:
+        file_path = os.path.join(dir, f"success_scores_{noise_db}dB.npy")
+        if not os.path.isfile(file_path):
+            raise FileNotFoundError(f"File '{file_path}' not found.")
+        scores = np.load(file_path)
+        absc = noise_db * np.ones(scores.shape[0])
+        ax.scatter(absc, scores, marker="s", color="black")
     
-    def create_synthetic_dictionary(self, n_atoms: int, normalize_columns: bool = False, return_dict: bool = False):
-        """ 
-        Create a synthetic dictionary of $n_atoms$ atoms of dimension $n_features$.
-        Each atom is a random vector of dimension $n_features$.
-        """
-        self.dict = np.random.randn(self.n_features, n_atoms)
-        if normalize_columns:
-            self.dict /= np.linalg.norm(self.dict, axis=0)
-        if return_dict:
-            return self.dict
-
-    def create_synthetic_signals(self, n_signals: int, sparsity: int, noise_std: float = 0, return_signals: bool = False):
-        """ 
-        Create a synthetic set of $n_signals$ signals of dimension $n_features$.
-        Each signal is a sparse linear combination of $sparsity$ atoms from $dict$.
-        """
-
-        if self.dict is None:
-            raise ValueError("You must create a dictionary before creating signals.")
-
-        n_atoms = self.dict.shape[1]
-        self.coeffs = np.zeros((n_atoms, n_signals))
-        for idx in range(n_signals):
-            self.coeffs[np.random.choice(n_atoms, size=sparsity, replace=False), idx] = 1
-        self.signals = self.dict @ self.coeffs
-
-        if noise_std > 0:
-            noise_sigma = noise_std * np.ones((self.n_features, 1)) @ np.random.rand(1, n_signals)
-            self.signals += noise_sigma * np.random.randn(self.n_features, n_signals)
-
-        if return_signals:
-            return self.signals
-    
-    def sucess_score(self, designed_dict: np.ndarray, tol: float = 0.01):
-        """ 
-        Compute the success score (see the paper for details) of $designed_dictionary$ with respect to the dictionary $self.dict$.
-        """
-
-        if self.dict is None:
-            raise ValueError("You must create a dictionary before computing the success score.")
-
-        if self.dict.shape != designed_dict.shape:
-            raise ValueError("The shape of the designed dictionary must be the same as the shape of the dictionary created by the class.")
-
-        n_atoms = self.dict.shape[1]
-        atoms_matching = -1 * np.ones(n_atoms)
-
-        for col_idx in range(n_atoms):
-            distance = np.zeros(n_atoms)
-            for i in range(n_atoms):
-                distance[i] = 1 - np.abs(self.dict[:,col_idx].T @ designed_dict[:,i])
-            idx_matching = np.argmin(distance)
-            if atoms_matching[idx_matching] < tol:
-                atoms_matching[idx_matching] = idx_matching
-        
-        success_score = np.sum(atoms_matching >= 0)
-        
-        return success_score
+    ax.set_title(f"Success scores over {n_runs} runs for the synthetic experiment", size=16)
+    ax.set_xticks(noise_levels, [f"{x}dB" for x in noise_levels])
+    ax.set_yticks([25, 30, 35, 40, 45, 50])
+    ax.set_xlabel("noise level (dB)")
+    ax.set_ylabel(f"success score (threshold={success_threshold})")
+    ax.grid(True)
+    ax.set_axisbelow(True) # put grid behind the plot
+    fig.savefig(os.path.join(dir, "success_scores.png"), dpi=300)
+    print(f"Figure 'success_scores.png' saved in '{dir}'!")
 
 
 if __name__ == "__main__":
-        
-    data = SyntheticData(n_features=6)
-    data.create_synthetic_dictionary(n_atoms=10, normalize_columns=True, return_dict=False)
-    y = data.create_synthetic_signals(n_signals=100, sparsity=3, noise_std=0.1, return_signals=True)
-    print(f"Synthetic data with shape {y.shape} was successfully created!")
-
-    score = data.sucess_score(designed_dict=data.dict)
-    assert score == data.dict.shape[1], "The success score should be equal to the number of atoms in the dictionary when testing the original dictionary."
+    
+    plot_results_synthetic_exp(
+        dir="synthetic_experiments/",
+        n_runs=50,
+        success_threshold=0.01
+    )
