@@ -1,3 +1,5 @@
+import os
+from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
@@ -81,7 +83,7 @@ class OrthogonalMatchingPursuit(Pursuit):
         self.support = np.zeros((K, N), dtype=bool)
         self.selection_order = np.zeros((self.sparsity, N), dtype=int)
         self.res_norms = np.zeros((self.sparsity+1, N), dtype=float)
-        self.res_norms[0] = np.linalg.norm(residual)
+        self.res_norms[0] = np.linalg.norm(residual, axis=0)
         self.reconstructions = np.zeros((n, y.shape[1], self.sparsity), dtype=float)
         self.is_fit = False
         self.runtime = time()
@@ -111,47 +113,35 @@ class OrthogonalMatchingPursuit(Pursuit):
         if return_coeffs:
             return self.coeffs
 
-    def plot_residual_norms(self, plot: bool = True, save: bool = False):
-        """ Plot the evolution of the residual norms during the OMP iterations """
+    def plot_residual_norms(self, plot: bool = True, save: bool = False, save_dir: str = None):
+        """ Plot the evolution of each residual norm during the OMP iterations """
 
         if not self.is_fit:
             raise ValueError("The OMP algorithm has not been run yet. Please run OMP.fit() first.")
         
         fig, ax = plt.subplots()
-        ax.plot(self.res_norms / np.linalg.norm(self.signal), marker="o")
+        for res_idx in range(self.res_norms.shape[1]):
+            res_values = self.res_norms[:, res_idx] / self.res_norms[0, res_idx]
+            ax.plot(res_values, marker="o")
+        mean_res_values = np.mean(self.res_norms, axis=1) / np.mean(self.res_norms[0])
+        ax.plot(mean_res_values, linestyle="--", color="black", label="mean")
         ax.set_xlabel("step")
         ax.set_ylabel("Ratio residual_norm / signal_norm")
-        ax.title.set_text("Residual norm evolution during OMP iterations")
+        ax.title.set_text("Residuals norm evolution during OMP iterations")
 
         if plot:
             plt.show()
         if save:
-            fig.savefig("images/residual_norms.png")
-
-    def plot_activations(self, plot: bool = True, save: bool = False):
-        """ Plot the activations selected by OMP """
-
-        if not self.is_fit:
-            raise ValueError("The OMP algorithm has not been run yet. Please run OMP.fit() first.")
-        
-        activations = self.coeffs[np.array(self.selection_order)]
-
-        fig, ax = plt.subplots()
-        ax.stem(np.arange(activations.shape[0]), np.abs(activations), basefmt="r-", linefmt="--", markerfmt="o")
-        ax.set_xlabel('selection order of the coefficients')
-        ax.set_ylabel('activation (absolute value of a coefficient)')
-        ax.set_title('Activations of atoms selected by OMP')
-
-        if plot:
-            plt.show()
-        if save:
-            fig.savefig("images/activations.png")
+            if save_dir is None:
+                save_dir = "default_plots/"
+            Path(save_dir).mkdir(parents=True, exist_ok=True)
+            fig.savefig(os.path.join(save_dir, "residual_norms.png"))
 
 
 if __name__ == "__main__":
     
     dict = np.random.randn(10, 5)
-    y = np.random.randn(10, 1000)
+    y = np.random.randn(10, 10)
 
     # sklearn OMP test
     sklearn_omp = SklearnOrthogonalMatchingPursuit(dict=dict, sparsity=3, verbose=False)
@@ -164,3 +154,4 @@ if __name__ == "__main__":
     print("SklearnOMP method was successfully initialized!")
     omp.fit(y=y, precompute=False)
     print(f"SklearnOMP fit method didn't crash! (runtime={omp.runtime:.3f}s)")
+    # omp.plot_residual_norms(plot=False, save=True, save_dir="images/")
