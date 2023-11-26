@@ -35,7 +35,7 @@ def mutli_run_ksvd_synthetic_experiment(
     Run KSVD $n_runs$ times with the given parameters and return statistics on the success scores.
     """
 
-    noise_std = 10 ** (-float(noise_db)/10) if noise_db > 0 else 0
+    noise_std = np.sqrt(10 ** (float(noise_db)/20)) if noise_db > 0 else 0
     scores = np.zeros(n_runs)
     for run_idx in tqdm(range(n_runs), desc=f"Running experiments with noise {noise_db}dB"):
 
@@ -82,8 +82,8 @@ def main():
             n_atoms = 50,
             sparsity = 3,
             noise_db = noise_db,
-            max_iter = 2,
-            n_runs = 5,
+            max_iter = 80,
+            n_runs = 50,
             pursuit_method = OrthogonalMatchingPursuit,
             success_threshold = 0.01,
             plot = False,
