@@ -13,7 +13,8 @@ def plot_results_synthetic_exp(dir: str = None, n_runs: int = 50, success_thresh
     for noise_db in noise_levels:
         file_path = os.path.join(dir, f"success_scores_{noise_db}dB.npy")
         if not os.path.isfile(file_path):
-            raise FileNotFoundError(f"File '{file_path}' not found.")
+            print(f"File '{file_path}' was not found...")
+            continue
         scores = np.load(file_path)
         absc = noise_db * np.ones(scores.shape[0])
         ax.scatter(absc, scores, marker="s", color="black")
