@@ -11,12 +11,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
-from functools import partial
-from multiprocessing.pool import Pool
-
 from pursuits import Pursuit, SklearnOrthogonalMatchingPursuit, OrthogonalMatchingPursuit
 from dictionary_learning import KSVD
-from patch_data import PatchDataGenerator
+from patch_data import PatchDataGenerator, PatchBasis
 
 
 def run_ksvd_image_experiment(
@@ -39,15 +36,14 @@ def run_ksvd_image_experiment(
     data = data_engine.create_patch_dataset(n_patches=n_patches, patch_size=patch_size, return_data=True)
 
     # run KSVD
-    ksvd = KSVD(n_atoms=n_atoms, sparsity=sparsity, pursuit_method=pursuit_method, use_dc_atom=True, verbose=False)
-    ksvd.fit(y=data, max_iter=max_iter, return_reconstruction=False, verbose=True)
-
-    print(ksvd.dict.shape)
+    ksvd = KSVD(n_atoms=n_atoms, sparsity=sparsity, pursuit_method=pursuit_method, use_dc_atom=True, verbose=True)
+    ksvd.fit(y=data, max_iter=max_iter, return_reconstruction=False)
 
     if save:
         save_dir = save_dir if save_dir is not None else ""
         Path(save_dir).mkdir(parents=True, exist_ok=True)
-        np.save(os.path.join(save_dir, f"patch_dict_K={n_atoms}.npy", ksvd.dict))
+        np.save(os.path.join(save_dir, f"patch_dict_K={n_atoms}.npy"), ksvd.dict)
+        np.save(os.path.join(save_dir, f"residual_hist_K={n_atoms}.npy"), np.array(ksvd.residual_history))
     
     if return_dict:
         return ksvd.dict
@@ -62,20 +58,20 @@ def main():
         n_patches = 11_000,
         n_atoms = 441,
         sparsity = 10,
-        max_iter = 20,
+        max_iter = 50,
         pursuit_method = OrthogonalMatchingPursuit,
         save = True,
         save_dir = save_dir,
         return_dict=False,
     )
 
-    # plot_results_synthetic_exp(
-    #     dir=save_dir,
-    #     n_runs=50,
-    #     success_threshold=0.01,
-    #     plot_groups=False,
-    #     group_size=10,
-    # )
+    basis = PatchBasis(
+        dict = np.load(os.path.join(save_dir, f"patch_dict_K=441.npy")),
+        basis_name = "KSVD",
+        save_dir = save_dir,
+    )
+
+    basis.plot_dictionnary(ncol_plot=21, save=True) # 21x21 = 441 atoms
     
 
 if __name__ == "__main__":
