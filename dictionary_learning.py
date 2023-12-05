@@ -13,6 +13,7 @@ class KSVD:
         self.coeffs = None
         self.dc_atom = use_dc_atom # use the first atom of self.dict as the DC atom and never update it
         self.iteration = None
+        self.residual_history = None
         self.verbose = verbose
     
     def fit(self, y: np.ndarray, max_iter: int = None, tol: float = None, return_reconstruction: bool = False):
@@ -27,6 +28,7 @@ class KSVD:
             self.dict[:,0] = np.ones(n, dtype=float) / np.sqrt(n)
             self.dict[:,1:] -= np.mean(self.dict[:,1:], axis=0)
 
+        self.residual_history = []
         stopping_criterion = False
         self.iteration = 0
         while not stopping_criterion:
@@ -57,6 +59,7 @@ class KSVD:
                     print(f"Atom {k} was not used in any signal therefore it was not updated during this iteration.")
 
             residual = np.linalg.norm(y - self.dict @ self.coeffs)
+            self.residual_history.append(residual)
             stopping_criterion = self.check_stopping_rule(residual, max_iter, tol)
 
             if self.verbose:
