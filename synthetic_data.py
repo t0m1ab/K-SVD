@@ -57,12 +57,10 @@ class SyntheticData:
         atoms_matching = -1 * np.ones(n_atoms)
 
         for col_idx in range(n_atoms):
-            distance = np.zeros(n_atoms)
-            for i in range(n_atoms):
-                distance[i] = 1 - np.abs(self.dict[:,col_idx].T @ designed_dict[:,i])
+            distance = np.ones(n_atoms) - np.abs(self.dict[:,col_idx].T @ designed_dict)
             idx_matching = np.argmin(distance)
-            if atoms_matching[idx_matching] < threshold:
-                atoms_matching[idx_matching] = idx_matching
+            if distance[idx_matching] < threshold:
+                atoms_matching[col_idx] = idx_matching
         
         success_score = np.sum(atoms_matching >= 0)
         
