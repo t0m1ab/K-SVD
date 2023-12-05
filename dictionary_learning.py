@@ -5,12 +5,13 @@ from pursuits import Pursuit, SklearnOrthogonalMatchingPursuit, OrthogonalMatchi
 
 class KSVD:
     """ Perform K-SVD algorithm to learn a dictionary from a set of signals Y as well as the sparse representation of Y using the dictionary ."""
-    def __init__(self, n_atoms: int, sparsity: int, pursuit_method: Pursuit, verbose: bool = False) -> None:
+    def __init__(self, n_atoms: int, sparsity: int, pursuit_method: Pursuit, use_dc_atom: bool = False, verbose: bool = False) -> None:
         self.K = n_atoms
         self.sparsity = sparsity
         self.pursuit_method = pursuit_method
         self.dict = None
         self.coeffs = None
+        self.dc_atom = use_dc_atom # use the first atom of self.dict as the DC atom and never update it
         self.iteration = None
         self.verbose = verbose
     
@@ -22,6 +23,9 @@ class KSVD:
         n, N = y.shape # n_features, n_signals
         self.dict = np.random.randn(n, self.K)
         self.dict /= np.linalg.norm(self.dict, axis=0)
+        if self.dc_atom: # first atom is the DC atom and other atoms are zero mean
+            self.dict[:,0] = np.ones(n, dtype=float) / np.sqrt(n)
+            self.dict[:,1:] -= np.mean(self.dict[:,1:], axis=0)
 
         stopping_criterion = False
         self.iteration = 0
@@ -32,7 +36,7 @@ class KSVD:
             self.coeffs = pursuit_algo.fit(y=y, precompute=False, return_coeffs=True)
 
             # codebook update stage
-            for k in range(self.K):
+            for k in range(int(self.dc_atom), self.K):
                 
                 selected_indexes = [i for i in range(self.K)]
                 selected_indexes.pop(k)
@@ -40,14 +44,18 @@ class KSVD:
                 E_k = y - self.dict[:,selected_indexes] @ self.coeffs[selected_indexes,:]
 
                 xk_T_nonzero_indexes = np.where(self.coeffs[k])[0]
-                omega_k = np.zeros((N, xk_T_nonzero_indexes.shape[0]))
-                omega_k[xk_T_nonzero_indexes, np.arange(xk_T_nonzero_indexes.shape[0])] = 1
+                
+                if len(xk_T_nonzero_indexes) > 0: # atom k should be used in at least one signal to be updated
+                    omega_k = np.zeros((N, xk_T_nonzero_indexes.shape[0]))
+                    omega_k[xk_T_nonzero_indexes, np.arange(xk_T_nonzero_indexes.shape[0])] = 1
 
-                U, delta, Vh = np.linalg.svd(E_k @ omega_k, full_matrices=True)
+                    U, delta, Vh = np.linalg.svd(E_k @ omega_k, full_matrices=True)
 
-                self.dict[:,k] = U[:,0]
-                self.coeffs[k,xk_T_nonzero_indexes] = delta[0] * Vh[0,:] # first_singular_value = delta[0] if len(delta.shape) > 0 else 1
-            
+                    self.dict[:,k] = U[:,0]
+                    self.coeffs[k,xk_T_nonzero_indexes] = delta[0] * Vh[0,:]
+                else:
+                    print(f"Atom {k} was not used in any signal therefore it was not updated during this iteration.")
+
             residual = np.linalg.norm(y - self.dict @ self.coeffs)
             stopping_criterion = self.check_stopping_rule(residual, max_iter, tol)
 
