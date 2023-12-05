@@ -16,7 +16,7 @@ from multiprocessing.pool import Pool
 
 from pursuits import Pursuit, SklearnOrthogonalMatchingPursuit, OrthogonalMatchingPursuit
 from dictionary_learning import KSVD
-from synthetic_data import SyntheticData
+from synthetic_data import SyntheticDataGenerator
 from utils import plot_results_synthetic_exp
 
 
@@ -39,9 +39,9 @@ def run_ksvd_synthetic_experiment(
         print(f"Exp PID={os.getpid()} just started")
 
     # create synthetic data
-    data = SyntheticData(n_features=n_features)
-    data.create_synthetic_dictionary(n_atoms=n_atoms, normalize_columns=True, return_dict=False)
-    y = data.create_synthetic_signals(n_signals=n_signals, sparsity=sparsity, noise_std=noise_std, return_signals=True)
+    data_engine = SyntheticDataGenerator(n_features=n_features)
+    data_engine.create_synthetic_dictionary(n_atoms=n_atoms, normalize_columns=True, return_dict=False)
+    y = data_engine.create_synthetic_signals(n_signals=n_signals, sparsity=sparsity, noise_std=noise_std, return_signals=True)
 
     if logs:
         print(f"Exp PID={os.getpid()} created data")
@@ -54,7 +54,7 @@ def run_ksvd_synthetic_experiment(
         print(f"Exp PID={os.getpid()} executed KSVD")
 
     # compute score
-    score = data.sucess_score(designed_dict=ksvd.dict, threshold=success_threshold)
+    score = data_engine.sucess_score(designed_dict=ksvd.dict, threshold=success_threshold)
 
     if logs:
         print(f"Exp PID={os.getpid()} finished with score={score}")

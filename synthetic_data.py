@@ -1,7 +1,7 @@
 import numpy as np
 
 
-class SyntheticData:
+class SyntheticDataGenerator:
     
     def __init__(self, n_features: int) -> None:
         self.n_features = n_features
@@ -69,10 +69,10 @@ class SyntheticData:
 
 if __name__ == "__main__":
         
-    data = SyntheticData(n_features=6)
-    data.create_synthetic_dictionary(n_atoms=10, normalize_columns=True, return_dict=False)
-    y = data.create_synthetic_signals(n_signals=100, sparsity=3, noise_std=0.1, return_signals=True)
+    data_engine = SyntheticDataGenerator(n_features=6)
+    data_engine.create_synthetic_dictionary(n_atoms=10, normalize_columns=True, return_dict=False)
+    y = data_engine.create_synthetic_signals(n_signals=100, sparsity=3, noise_std=0.1, return_signals=True)
     print(f"Synthetic data with shape {y.shape} was successfully created!")
 
-    score = data.sucess_score(designed_dict=data.dict)
-    assert score == data.dict.shape[1], "The success score should be equal to the number of atoms in the dictionary when testing the original dictionary."
+    score = data_engine.sucess_score(designed_dict=data_engine.dict)
+    assert score == data_engine.dict.shape[1], "The success score should be equal to the number of atoms in the dictionary when testing the original dictionary."
