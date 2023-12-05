@@ -14,7 +14,7 @@ class SyntheticData:
         Create a synthetic dictionary of $n_atoms$ atoms of dimension $n_features$.
         Each atom is a random vector of dimension $n_features$.
         """
-        self.dict = np.random.randn(self.n_features, n_atoms)
+        self.dict = np.random.uniform(low=-1.0, high=1.0, size=(self.n_features, n_atoms))
         if normalize_columns:
             self.dict /= np.linalg.norm(self.dict, axis=0)
         if return_dict:
@@ -36,8 +36,8 @@ class SyntheticData:
         self.signals = self.dict @ self.coeffs
 
         if noise_std > 0:
-            noise_sigma = noise_std * np.ones((self.n_features, 1)) @ np.random.rand(1, n_signals)
-            self.signals += noise_sigma * np.random.randn(self.n_features, n_signals)
+            # print(f"Noise std added to the signals = {noise_std}")
+            self.signals += np.random.normal(scale=noise_std, size=(self.n_features, n_signals))
 
         if return_signals:
             return self.signals
