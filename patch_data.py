@@ -18,10 +18,10 @@ class PatchDataGenerator:
         self.patch_size = None
         self.n_patches = None
         self.data = None
+        self.save_dir = ""
         if save_dir is not None:
+            self.save_dir = save_dir
             Path(save_dir).mkdir(parents=True, exist_ok=True) # default directory to save plots
-        else:
-            save_dir = ""
   
     def create_patch_dataset(self, patch_size: int, n_patches: int, return_data: bool = False) -> None | np.ndarray:
         """ 
@@ -139,9 +139,56 @@ class PatchDataGenerator:
             plt.show()
 
 
+class PatchBasis:
+
+    def __init__(self, dict: np.ndarray, basis_name: str = None, save_dir: str = None) -> None:
+        self.dict = dict
+        self.n_atoms = dict.shape[1]
+        self.patch_size = int(np.sqrt(dict.shape[0]))
+        if self.patch_size ** 2 != dict.shape[0]:
+            raise ValueError("The dictionnary doesn't contain square patches in its columns.")
+        self.basis_name = basis_name if basis_name is not None else "Unknown basis"
+        self.save_dir = ""
+        if save_dir is not None:
+            self.save_dir = save_dir
+            Path(save_dir).mkdir(parents=True, exist_ok=True)
+
+    
+    def plot_dictionnary(self, ncol_plot: int = None, save: bool = False):
+
+        if ncol_plot is None:
+            ncol_plot = int(np.sqrt(self.dict.shape[1]))
+            if ncol_plot ** 2 < self.n_atoms: # not a perfect square number of atoms
+                ncol_plot += 1
+        
+        nrow = (self.n_atoms // ncol_plot) + 1 if (self.n_atoms % ncol_plot) > 0 else (self.n_atoms // ncol_plot)
+
+        # build the array containing all patches
+        collection = np.ndarray((nrow*self.patch_size, ncol_plot*self.patch_size))
+        for idx in range(self.n_atoms):
+            row = (idx // ncol_plot) * self.patch_size
+            col = (idx % ncol_plot) * self.patch_size
+            patch = self.dict[:,idx].reshape((self.patch_size, self.patch_size))
+            collection[row:row+self.patch_size, col:col+self.patch_size] = patch
+        
+        # plot collection
+        fig, ax = plt.subplots(1, 1, figsize=(8, 8))
+        ax.imshow(collection, cmap='gray')
+        ax.set_title(f"{self.basis_name} basis with {self.n_atoms} patches", size=16)
+        plt.axis('off')
+        fig.tight_layout()
+        if save:
+            file_name = f"{self.basis_name.lower().replace(' ','-')}_basis.png"
+            plt.savefig(os.path.join(self.save_dir, file_name), dpi=300)
+        else:
+            plt.show()
+
+                
+
+
 if __name__ == "__main__":
         
-    data_engine = PatchDataGenerator(dataset_name="olivetti", save_dir="outputs/")
+    data_engine = PatchDataGenerator(dataset_name="olivetti", save_dir="patch_experiments/")
     patches = data_engine.create_patch_dataset(patch_size=8, n_patches=1000, return_data=False)
 
     data_engine.plot_random_patches(save=True)
