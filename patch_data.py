@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 import os
 from pathlib import Path
 
+from utils import create_haar_dict
+
 
 class PatchDataGenerator:
     
@@ -152,9 +154,8 @@ class PatchBasis:
         if save_dir is not None:
             self.save_dir = save_dir
             Path(save_dir).mkdir(parents=True, exist_ok=True)
-
     
-    def plot_dictionnary(self, ncol_plot: int = None, save: bool = False):
+    def __plot_dictionnary_without_borders(self, ncol_plot: int = None, save: bool = False):
 
         if ncol_plot is None:
             ncol_plot = int(np.sqrt(self.dict.shape[1]))
@@ -182,14 +183,64 @@ class PatchBasis:
             plt.savefig(os.path.join(self.save_dir, file_name), dpi=300)
         else:
             plt.show()
+    
+    def __plot_dictionnary_with_borders(self, save: bool = False):
+        """
+        Plot dictionary with borders between patches.
+        """
 
-                
+        n_patches = self.dict.shape[1]
+        n_patches_edge = int(np.sqrt(n_patches))
+        if n_patches_edge ** 2 != n_patches:
+            raise ValueError("The dictionnary must contain a square number of patches.")
+        
+        patch_size = int(np.sqrt(self.dict.shape[0]))
+        if patch_size ** 2 != self.dict.shape[0]:
+            raise ValueError("The dictionnary must contain square patches.")
+        
+        # build the array containing all patches
+        collection_edge = n_patches_edge * (patch_size + 1) - 1 # one line between each patch
+        collection_with_borders = -np.ones((collection_edge, collection_edge))
+        for patch_idx in range(n_patches):
+            # row/col position of the patch in the collection
+            row = (patch_idx // n_patches_edge)
+            col = (patch_idx % n_patches_edge)
+            # pixel position of the patch in the collection
+            up = row * patch_size
+            left = col * patch_size
+            # extract patch from the dictionnary and copy it in the collection with borders
+            patch = self.dict[:, patch_idx].reshape((patch_size, patch_size))
+            collection_with_borders[up+row:up+row+patch_size, left+col:left+col+patch_size] = patch
+
+        # plot collection with borders
+        fig, ax = plt.subplots(1, 1, figsize=(8, 8))
+        ax.imshow(collection_with_borders, cmap='gray')
+        ax.set_title(f"{self.basis_name} basis with {self.n_atoms} patches", size=16)
+        plt.axis('off')
+        fig.tight_layout()
+        if save:
+            file_name = f"{self.basis_name.lower().replace(' ','-')}_basis.png"
+            plt.savefig(os.path.join(self.save_dir, file_name), dpi=300)
+        else:
+            plt.show()
+    
+    def plot_dictionnary(self, ncol_plot: int = None, borders: bool = False, save: bool = False):
+        if not borders:
+            self.__plot_dictionnary_without_borders(ncol_plot=ncol_plot, save=save)
+        else:
+            self.__plot_dictionnary_with_borders(save=save)
 
 
 if __name__ == "__main__":
-        
-    data_engine = PatchDataGenerator(dataset_name="olivetti", save_dir="patch_experiments/")
-    patches = data_engine.create_patch_dataset(patch_size=8, n_patches=1000, return_data=False)
+    
+    ## Face patch dataset
+    # data_engine = PatchDataGenerator(dataset_name="olivetti", save_dir="patch_experiments/")
+    # patches = data_engine.create_patch_dataset(patch_size=8, n_patches=1000, return_data=False)
+    # data_engine.plot_random_patches(save=True)
+    # data_engine.plot_collection(n=500, nrow_plot=10, sort_variance=True, save=True)
 
-    data_engine.plot_random_patches(save=True)
-    data_engine.plot_collection(n=500, nrow_plot=10, sort_variance=True, save=True)
+    ## Haar basis
+    # haar_basis = PatchBasis(dict=create_haar_dict(patch_size=8), basis_name="Haar", save_dir="patch_experiments/")
+    # haar_basis.plot_dictionnary(borders=True, save=True)
+
+    print("Done!")
