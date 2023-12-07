@@ -71,7 +71,7 @@ def main():
         save_dir = save_dir,
     )
 
-    basis.plot_dictionnary(ncol_plot=21, save=True) # 21x21 = 441 atoms
+    basis.plot_dictionary(ncol_plot=21, save=True) # 21x21 = 441 atoms
     
 
 if __name__ == "__main__":

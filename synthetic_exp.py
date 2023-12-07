@@ -89,7 +89,7 @@ def mutli_run_ksvd_synthetic_experiment(
     Run KSVD $n_runs$ times with the given parameters and return statistics on the success scores.
     """
 
-    # define noise_std from noise_db considering that generating dictionnary values follow U[-a,a]
+    # define noise_std from noise_db considering that generating dictionary values follow U[-a,a]
     noise_std = (10 ** (-float(noise_db)/20)) / np.sqrt(n_features) if noise_db > 0 else 0
 
     # define number of processes to run the experiments

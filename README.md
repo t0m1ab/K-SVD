@@ -1,4 +1,4 @@
-# K-SVD: dictionnary design for sparse representation
+# K-SVD: dictionary design for sparse representation
 
 **Authors:** Tom LABIAUSSE & Grégoire GISSOT
 
