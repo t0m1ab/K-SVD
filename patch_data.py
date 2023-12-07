@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import os
 from pathlib import Path
 
-from utils import create_haar_dict
+from utils import create_haar_dict, create_dct_dict
 
 
 class PatchDataGenerator:
@@ -148,14 +148,14 @@ class PatchBasis:
         self.n_atoms = dict.shape[1]
         self.patch_size = int(np.sqrt(dict.shape[0]))
         if self.patch_size ** 2 != dict.shape[0]:
-            raise ValueError("The dictionnary doesn't contain square patches in its columns.")
+            raise ValueError("The dictionary doesn't contain square patches in its columns.")
         self.basis_name = basis_name if basis_name is not None else "Unknown basis"
         self.save_dir = ""
         if save_dir is not None:
             self.save_dir = save_dir
             Path(save_dir).mkdir(parents=True, exist_ok=True)
     
-    def __plot_dictionnary_without_borders(self, ncol_plot: int = None, save: bool = False):
+    def __plot_dictionary_without_borders(self, ncol_plot: int, transpose_dict: bool, save: bool):
 
         if ncol_plot is None:
             ncol_plot = int(np.sqrt(self.dict.shape[1]))
@@ -170,7 +170,10 @@ class PatchBasis:
             row = (idx // ncol_plot) * self.patch_size
             col = (idx % ncol_plot) * self.patch_size
             patch = self.dict[:,idx].reshape((self.patch_size, self.patch_size))
-            collection[row:row+self.patch_size, col:col+self.patch_size] = patch
+            if not transpose_dict:
+                collection[row:row+self.patch_size, col:col+self.patch_size] = patch
+            else:
+                collection[col:col+self.patch_size, row:row+self.patch_size] = patch
         
         # plot collection
         fig, ax = plt.subplots(1, 1, figsize=(8, 8))
@@ -184,7 +187,7 @@ class PatchBasis:
         else:
             plt.show()
     
-    def __plot_dictionnary_with_borders(self, save: bool = False):
+    def __plot_dictionary_with_borders(self, transpose_dict: bool, save: bool):
         """
         Plot dictionary with borders between patches.
         """
@@ -192,25 +195,24 @@ class PatchBasis:
         n_patches = self.dict.shape[1]
         n_patches_edge = int(np.sqrt(n_patches))
         if n_patches_edge ** 2 != n_patches:
-            raise ValueError("The dictionnary must contain a square number of patches.")
-        
-        patch_size = int(np.sqrt(self.dict.shape[0]))
-        if patch_size ** 2 != self.dict.shape[0]:
-            raise ValueError("The dictionnary must contain square patches.")
+            raise ValueError("The dictionary must contain a square number of patches.")
         
         # build the array containing all patches
-        collection_edge = n_patches_edge * (patch_size + 1) - 1 # one line between each patch
+        collection_edge = n_patches_edge * (self.patch_size + 1) - 1 # one line between each patch
         collection_with_borders = -np.ones((collection_edge, collection_edge))
         for patch_idx in range(n_patches):
             # row/col position of the patch in the collection
             row = (patch_idx // n_patches_edge)
             col = (patch_idx % n_patches_edge)
             # pixel position of the patch in the collection
-            up = row * patch_size
-            left = col * patch_size
-            # extract patch from the dictionnary and copy it in the collection with borders
-            patch = self.dict[:, patch_idx].reshape((patch_size, patch_size))
-            collection_with_borders[up+row:up+row+patch_size, left+col:left+col+patch_size] = patch
+            up = row * self.patch_size
+            left = col * self.patch_size
+            # extract patch from the dictionary and copy it in the collection with borders
+            patch = self.dict[:, patch_idx].reshape((self.patch_size, self.patch_size))
+            if not transpose_dict:
+                collection_with_borders[up+row:up+row+self.patch_size, left+col:left+col+self.patch_size] = patch
+            else:
+                collection_with_borders[left+col:left+col+self.patch_size, up+row:up+row+self.patch_size] = patch
 
         # plot collection with borders
         fig, ax = plt.subplots(1, 1, figsize=(8, 8))
@@ -224,11 +226,11 @@ class PatchBasis:
         else:
             plt.show()
     
-    def plot_dictionnary(self, ncol_plot: int = None, borders: bool = False, save: bool = False):
+    def plot_dictionary(self, ncol_plot: int = None, borders: bool = False, transpose_dict: bool = False, save: bool = False):
         if not borders:
-            self.__plot_dictionnary_without_borders(ncol_plot=ncol_plot, save=save)
+            self.__plot_dictionary_without_borders(ncol_plot=ncol_plot, transpose_dict=transpose_dict, save=save)
         else:
-            self.__plot_dictionnary_with_borders(save=save)
+            self.__plot_dictionary_with_borders(transpose_dict=transpose_dict, save=save)
 
 
 if __name__ == "__main__":
@@ -239,8 +241,18 @@ if __name__ == "__main__":
     # data_engine.plot_random_patches(save=True)
     # data_engine.plot_collection(n=500, nrow_plot=10, sort_variance=True, save=True)
 
-    ## Haar basis
-    # haar_basis = PatchBasis(dict=create_haar_dict(patch_size=8), basis_name="Haar", save_dir="patch_experiments/")
-    # haar_basis.plot_dictionnary(borders=True, save=True)
+    ## Haar basis (don't normalize atoms for visualization purpose)
+    haar_basis = PatchBasis(
+        dict=create_haar_dict(patch_size=8, normalize_atoms=False),
+        basis_name="Haar",
+        save_dir="patch_experiments/"
+    )
+    haar_basis.plot_dictionary(borders=True, save=True)
 
-    print("Done!")
+    ## DCT basis (don't normalize atoms for visualization purpose)
+    dct_basis = PatchBasis(
+        dict=create_dct_dict(patch_size=8, K=21, normalize_atoms=False),
+        basis_name="DCT",
+        save_dir="patch_experiments/"
+    )
+    dct_basis.plot_dictionary(borders=True, transpose_dict=True, save=True)

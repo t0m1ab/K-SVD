@@ -4,6 +4,40 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
+def plot_results_synthetic_exp(dir: str = None, n_runs: int = 50, success_threshold: float = 0.01, plot_groups: bool = False, group_size: int = 10):
+    """ Plot the results of the synthetic experiment over different noise levels. """
+
+    noise_levels = [0, 10, 20, 30]
+    fig, ax = plt.subplots(figsize=(10, 5))
+
+    for noise_db in noise_levels:
+        file_path = os.path.join(dir, f"success_scores_{noise_db}dB.npy")
+        if not os.path.isfile(file_path):
+            print(f"File '{file_path}' was not found...")
+            continue
+        scores = np.load(file_path)
+        n_scores = scores.shape[0]
+
+        if plot_groups and n_scores % group_size == 0:
+            sorted_scores = np.sort(scores)
+            group_mean_scores = np.mean(sorted_scores.reshape((-1, group_size)), axis=1)
+            absc = noise_db * np.ones(group_mean_scores.shape[0])
+            ax.scatter(absc, group_mean_scores, marker="s", color="red")
+        else:
+            absc = noise_db * np.ones(scores.shape[0])
+            ax.scatter(absc, scores, marker="o", color="black")
+    
+    ax.set_title(f"Success scores over {n_runs} runs for the synthetic experiment", size=16)
+    ax.set_xticks(noise_levels, ["No noise", "10dB", "20dB", "30dB"])
+    ax.set_yticks([25, 30, 35, 40, 45, 50])
+    ax.set_xlabel("SNR (dB)")
+    ax.set_ylabel(f"success score (threshold={success_threshold})")
+    ax.grid(True)
+    ax.set_axisbelow(True) # put grid behind the plot
+    fig.savefig(os.path.join(dir, "success_scores.png"), dpi=300)
+    print(f"Figure 'success_scores.png' saved in '{dir}'!")
+
+
 def is_power_of_two(n: int) -> bool:
     """
     Check if n is a power of two.
@@ -52,10 +86,11 @@ def create_haar_row(n: int) -> np.ndarray:
     return haar_row
 
         
-def create_haar_dict(patch_size: int):
+def create_haar_dict(patch_size: int, normalize_atoms: bool = False) -> np.ndarray:
     """
-    Create a complete haar dictionary of size n x n.
+    Create an overcomplete haar dictionary for patches of size patch_size x patch_size.
     Use the trick of the tensor product between pure vertical/horizontal to create the dictionary then converts back to vectors.
+    The resulting atoms in the dictionary are not normalized by default.
     """
 
     # create first row and first column
@@ -76,52 +111,85 @@ def create_haar_dict(patch_size: int):
         for col in range(n_patches_edge):
             up = row * patch_size
             left = col * patch_size
-            haar_dict[:,n_patches_edge*row+col] = haar_collection[up:up+patch_size, left:left+patch_size].reshape(-1)
+            vector_atom = haar_collection[up:up+patch_size, left:left+patch_size].reshape(-1)
+            if normalize_atoms:
+                vector_atom = vector_atom / np.linalg.norm(vector_atom)
+            haar_dict[:,n_patches_edge*row+col] = vector_atom
 
     return haar_dict
 
 
-def plot_results_synthetic_exp(dir: str = None, n_runs: int = 50, success_threshold: float = 0.01, plot_groups: bool = False, group_size: int = 10):
-    """ Plot the results of the synthetic experiment over different noise levels. """
+def dctii(v: np.ndarray, normalized: bool = False, sampling_factor: int = None):
+    """
+    Computes the inverse discrete cosine transform of type II,
+    cf. https://en.wikipedia.org/wiki/Discrete_cosine_transform#DCT-II
 
-    noise_levels = [0, 10, 20, 30]
-    fig, ax = plt.subplots(figsize=(10, 5))
+    Args:
+        v: Input vector to transform
+        normalized: Normalizes the output to make output orthogonal
+        sampling_factor: Can be used to "oversample" the input to create overcomplete dictionaries
 
-    for noise_db in noise_levels:
-        file_path = os.path.join(dir, f"success_scores_{noise_db}dB.npy")
-        if not os.path.isfile(file_path):
-            print(f"File '{file_path}' was not found...")
-            continue
-        scores = np.load(file_path)
-        n_scores = scores.shape[0]
+    Returns:
+        Discrete cosine transformed vector
+    """
+    n = v.shape[0]
+    K = sampling_factor if sampling_factor else n
+    y = np.array([sum(np.multiply(v, np.cos((0.5 + np.arange(n)) * k * np.pi / K))) for k in range(K)])
+    if normalized:
+        y[0] = 1 / np.sqrt(2) * y[0]
+        y = np.sqrt(2 / n) * y
+    return y
 
-        if plot_groups and n_scores % group_size == 0:
-            sorted_scores = np.sort(scores)
-            group_mean_scores = np.mean(sorted_scores.reshape((-1, group_size)), axis=1)
-            absc = noise_db * np.ones(group_mean_scores.shape[0])
-            ax.scatter(absc, group_mean_scores, marker="s", color="red")
-        else:
-            absc = noise_db * np.ones(scores.shape[0])
-            ax.scatter(absc, scores, marker="o", color="black")
-    
-    ax.set_title(f"Success scores over {n_runs} runs for the synthetic experiment", size=16)
-    ax.set_xticks(noise_levels, ["No noise", "10dB", "20dB", "30dB"])
-    ax.set_yticks([25, 30, 35, 40, 45, 50])
-    ax.set_xlabel("SNR (dB)")
-    ax.set_ylabel(f"success score (threshold={success_threshold})")
-    ax.grid(True)
-    ax.set_axisbelow(True) # put grid behind the plot
-    fig.savefig(os.path.join(dir, "success_scores.png"), dpi=300)
-    print(f"Figure 'success_scores.png' saved in '{dir}'!")
+
+def dictionary_from_transform(transform, n: int, K: int, normalized: bool = False, inverse: bool = False):
+    """
+    Builds a Dictionary matrix from a given transform
+
+    Args:
+        transform: A valid transform (e.g. Haar, DCT-II)
+        n: number of rows transform dictionary
+        K: number of columns transform dictionary
+        normalized: If True, the columns will be l2-normalized
+        inverse: Uses the inverse transform (as usually needed in applications)
+
+    Returns:
+        Dictionary build from the Kronecker-Delta of the transform applied to the identity.
+    """
+    H = np.zeros((K, n))
+    for i in range(n):
+        v = np.zeros(n)
+        v[i] = 1.0
+        H[:, i] = transform(v, sampling_factor=K)
+    if inverse:
+        H = H.T
+    return np.kron(H.T, H.T)
+
+
+def create_dct_dict(patch_size: int, K: int, normalize_atoms: bool = False) -> np.ndarray:
+    """
+    Create an overcomplete dct dictionary for patches of size patch_size x patch_size.
+    The resutling dictionary containes K*K atoms.
+    The resulting atoms in the dictionary are not normalized by default.
+    """
+
+    dct_dict = dictionary_from_transform(dctii, n=patch_size, K=K)
+
+    if normalize_atoms:
+        for i in range(dct_dict.shape[1]):
+            dct_dict[:,i] = dct_dict[:,i] / np.linalg.norm(dct_dict[:,i])
+
+    return dct_dict
 
 
 if __name__ == "__main__":
-    
-    # plot_results_synthetic_exp(
-    #     dir="synthetic_experiments/",
-    #     n_runs=50,
-    #     success_threshold=0.01
-    # )
 
-    haar_dict = create_haar_dict(patch_size=8)
-    print(f"Haar dictionnary for patch size 8 was successfully created and has shape {haar_dict.shape} ")
+    patch_size = 8
+    K = 441
+
+    haar_dict = create_haar_dict(patch_size=patch_size)
+    assert haar_dict.shape == (patch_size**2, K)
+    print(f"Haar dictionary for patch size 8 was successfully created and has shape {haar_dict.shape} ")
+
+    dct_dict = create_dct_dict(patch_size=patch_size, K=np.sqrt(K).astype(int))
+    assert dct_dict.shape == (patch_size**2, K)
+    print(f"DCT dictionary for patch size 8 was successfully created and has shape {dct_dict.shape} ")
