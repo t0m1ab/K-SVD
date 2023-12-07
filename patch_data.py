@@ -141,15 +141,15 @@ class PatchDataGenerator:
             plt.show()
 
 
-class PatchBasis:
+class PatchDictionary:
 
-    def __init__(self, dict: np.ndarray, basis_name: str = None, save_dir: str = None) -> None:
+    def __init__(self, dict: np.ndarray, dict_name: str = None, save_dir: str = None) -> None:
         self.dict = dict
         self.n_atoms = dict.shape[1]
         self.patch_size = int(np.sqrt(dict.shape[0]))
         if self.patch_size ** 2 != dict.shape[0]:
             raise ValueError("The dictionary doesn't contain square patches in its columns.")
-        self.basis_name = basis_name if basis_name is not None else "Unknown basis"
+        self.dict_name = dict_name if dict_name is not None else "Unknown dictionary"
         self.save_dir = ""
         if save_dir is not None:
             self.save_dir = save_dir
@@ -178,11 +178,11 @@ class PatchBasis:
         # plot collection
         fig, ax = plt.subplots(1, 1, figsize=(8, 8))
         ax.imshow(collection, cmap='gray')
-        ax.set_title(f"{self.basis_name} basis with {self.n_atoms} patches", size=16)
+        ax.set_title(f"{self.dict_name} dictionary with {self.n_atoms} atoms", size=16)
         plt.axis('off')
         fig.tight_layout()
         if save:
-            file_name = f"{self.basis_name.lower().replace(' ','-')}_basis.png"
+            file_name = f"{self.dict_name.lower().replace(' ','-')}_dict.png"
             plt.savefig(os.path.join(self.save_dir, file_name), dpi=300)
         else:
             plt.show()
@@ -217,11 +217,11 @@ class PatchBasis:
         # plot collection with borders
         fig, ax = plt.subplots(1, 1, figsize=(8, 8))
         ax.imshow(collection_with_borders, cmap='gray')
-        ax.set_title(f"{self.basis_name} basis with {self.n_atoms} patches", size=16)
+        ax.set_title(f"{self.dict_name} dictionary with {self.n_atoms} atoms", size=16)
         plt.axis('off')
         fig.tight_layout()
         if save:
-            file_name = f"{self.basis_name.lower().replace(' ','-')}_basis.png"
+            file_name = f"{self.dict_name.lower().replace(' ','-')}_dict.png"
             plt.savefig(os.path.join(self.save_dir, file_name), dpi=300)
         else:
             plt.show()
@@ -242,17 +242,17 @@ if __name__ == "__main__":
     # data_engine.plot_collection(n=500, nrow_plot=10, sort_variance=True, save=True)
 
     ## Haar basis (don't normalize atoms for visualization purpose)
-    haar_basis = PatchBasis(
+    haar_dict = PatchDictionary(
         dict=create_haar_dict(patch_size=8, normalize_atoms=False),
-        basis_name="Haar",
+        dict_name="Haar",
         save_dir="patch_experiments/"
     )
-    haar_basis.plot_dictionary(borders=True, save=True)
+    haar_dict.plot_dictionary(borders=True, save=True)
 
     ## DCT basis (don't normalize atoms for visualization purpose)
-    dct_basis = PatchBasis(
+    dct_dict = PatchDictionary(
         dict=create_dct_dict(patch_size=8, K=21, normalize_atoms=False),
-        basis_name="DCT",
+        dict_name="DCT",
         save_dir="patch_experiments/"
     )
-    dct_basis.plot_dictionary(borders=True, transpose_dict=True, save=True)
+    dct_dict.plot_dictionary(borders=True, transpose_dict=True, save=True)
