@@ -86,7 +86,7 @@ def create_haar_row(n: int) -> np.ndarray:
     return haar_row
 
         
-def create_haar_dict(patch_size: int, normalize_atoms: bool = False) -> np.ndarray:
+def create_haar_dict(patch_size: int, normalize_atoms: bool = False, transpose_dict: bool = False) -> np.ndarray:
     """
     Create an overcomplete haar dictionary for patches of size patch_size x patch_size.
     Use the trick of the tensor product between pure vertical/horizontal to create the dictionary then converts back to vectors.
@@ -111,6 +111,8 @@ def create_haar_dict(patch_size: int, normalize_atoms: bool = False) -> np.ndarr
         for col in range(n_patches_edge):
             up = row * patch_size
             left = col * patch_size
+            if transpose_dict:
+                left, up = up, left
             vector_atom = haar_collection[up:up+patch_size, left:left+patch_size].reshape(-1)
             if normalize_atoms:
                 vector_atom = vector_atom / np.linalg.norm(vector_atom)
@@ -119,64 +121,44 @@ def create_haar_dict(patch_size: int, normalize_atoms: bool = False) -> np.ndarr
     return haar_dict
 
 
-def dctii(v: np.ndarray, normalized: bool = False, sampling_factor: int = None):
+def create_dct_row(n: int, freq_range: int) -> np.ndarray:
     """
-    Computes the inverse discrete cosine transform of type II,
-    cf. https://en.wikipedia.org/wiki/Discrete_cosine_transform#DCT-II
-
-    Args:
-        v: Input vector to transform
-        normalized: Normalizes the output to make output orthogonal
-        sampling_factor: Can be used to "oversample" the input to create overcomplete dictionaries
-
-    Returns:
-        Discrete cosine transformed vector
+    Create 1D cosine signals for each freq in [0,freq_range[ using DCT-II: https://en.wikipedia.org/wiki/Discrete_cosine_transform
+    Order them into a (freq_range, n) matrix and reshape it into a (1, freq_range*n) row vector.
     """
-    n = v.shape[0]
-    K = sampling_factor if sampling_factor else n
-    y = np.array([sum(np.multiply(v, np.cos((0.5 + np.arange(n)) * k * np.pi / K))) for k in range(K)])
-    if normalized:
-        y[0] = 1 / np.sqrt(2) * y[0]
-        y = np.sqrt(2 / n) * y
-    return y
+    table = np.array([[np.cos((0.5 + i) * k * np.pi / freq_range) for i in range(n)] for k in range(freq_range)])
+    return table.reshape((1,-1))
 
 
-def dictionary_from_transform(transform, n: int, K: int, normalized: bool = False, inverse: bool = False):
+def create_dct_dict(patch_size: int, K:int, normalize_atoms: bool = False, transpose_dict: bool = False) -> np.ndarray:
     """
-    Builds a Dictionary matrix from a given transform
-
-    Args:
-        transform: A valid transform (e.g. Haar, DCT-II)
-        n: number of rows transform dictionary
-        K: number of columns transform dictionary
-        normalized: If True, the columns will be l2-normalized
-        inverse: Uses the inverse transform (as usually needed in applications)
-
-    Returns:
-        Dictionary build from the Kronecker-Delta of the transform applied to the identity.
-    """
-    H = np.zeros((K, n))
-    for i in range(n):
-        v = np.zeros(n)
-        v[i] = 1.0
-        H[:, i] = transform(v, sampling_factor=K)
-    if inverse:
-        H = H.T
-    return np.kron(H.T, H.T)
-
-
-def create_dct_dict(patch_size: int, K: int, normalize_atoms: bool = False) -> np.ndarray:
-    """
-    Create an overcomplete dct dictionary for patches of size patch_size x patch_size.
-    The resutling dictionary containes K*K atoms.
+    Create an overcomplete dct dictionary containing K patches of size patch_size x patch_size.
+    Use the trick of the tensor product between pure vertical/horizontal to create the dictionary then converts back to vectors.
     The resulting atoms in the dictionary are not normalized by default.
     """
 
-    dct_dict = dictionary_from_transform(dctii, n=patch_size, K=K)
+    n_patches_edge = np.sqrt(K).astype(int)
+    if not n_patches_edge**2 == K:
+        raise ValueError("K must be a perfect square.")
 
-    if normalize_atoms:
-        for i in range(dct_dict.shape[1]):
-            dct_dict[:,i] = dct_dict[:,i] / np.linalg.norm(dct_dict[:,i])
+    # create dct row and first column
+    dct_row = create_dct_row(n=patch_size, freq_range=n_patches_edge)
+
+    # create the overcomplete dct dictionary with product of vertical and horizontal frequencies
+    dct_collection = dct_row.T @ dct_row
+
+    # convert each patch to a n*n vector
+    dct_dict = np.zeros((patch_size**2, K))
+    for row in range(n_patches_edge):
+        for col in range(n_patches_edge):
+            up = row * patch_size
+            left = col * patch_size
+            if transpose_dict:
+                left, up = up, left
+            vector_atom = dct_collection[up:up+patch_size, left:left+patch_size].reshape(-1)
+            if normalize_atoms:
+                vector_atom = vector_atom / np.linalg.norm(vector_atom)
+            dct_dict[:,n_patches_edge*row+col] = vector_atom
 
     return dct_dict
 
@@ -186,10 +168,10 @@ if __name__ == "__main__":
     patch_size = 8
     K = 441
 
-    haar_dict = create_haar_dict(patch_size=patch_size)
+    haar_dict = create_haar_dict(patch_size=patch_size, normalize_atoms=False, transpose_dict=False)
     assert haar_dict.shape == (patch_size**2, K)
-    print(f"Haar dictionary for patch size 8 was successfully created and has shape {haar_dict.shape} ")
+    print(f"Haar dictionary for patch size {patch_size} was successfully created and has shape {haar_dict.shape} ")
 
-    dct_dict = create_dct_dict(patch_size=patch_size, K=np.sqrt(K).astype(int))
+    dct_dict = create_dct_dict(patch_size=patch_size, K=K, normalize_atoms=False, transpose_dict=True)
     assert dct_dict.shape == (patch_size**2, K)
-    print(f"DCT dictionary for patch size 8 was successfully created and has shape {dct_dict.shape} ")
+    print(f"DCT dictionary for patch size {patch_size} was successfully created and has shape {dct_dict.shape} ")

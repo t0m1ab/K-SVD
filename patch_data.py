@@ -243,7 +243,7 @@ if __name__ == "__main__":
 
     ## Haar basis (don't normalize atoms for visualization purpose)
     haar_dict = PatchDictionary(
-        dict=create_haar_dict(patch_size=8, normalize_atoms=False),
+        dict=create_haar_dict(patch_size=8, normalize_atoms=False, transpose_dict=False),
         dict_name="Haar",
         save_dir="patch_experiments/"
     )
@@ -251,8 +251,8 @@ if __name__ == "__main__":
 
     ## DCT basis (don't normalize atoms for visualization purpose)
     dct_dict = PatchDictionary(
-        dict=create_dct_dict(patch_size=8, K=21, normalize_atoms=False),
+        dict=create_dct_dict(patch_size=8, K=441, normalize_atoms=False, transpose_dict=True),
         dict_name="DCT",
         save_dir="patch_experiments/"
     )
-    dct_dict.plot_dictionary(borders=True, transpose_dict=True, save=True)
+    dct_dict.plot_dictionary(borders=True, save=True)
