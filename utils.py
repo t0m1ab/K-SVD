@@ -86,12 +86,16 @@ def create_haar_row(n: int) -> np.ndarray:
     return haar_row
 
         
-def create_haar_dict(patch_size: int, normalize_atoms: bool = False, transpose_dict: bool = False) -> np.ndarray:
+def create_haar_dict(patch_size: int, K:int, normalize_atoms: bool = False, transpose_dict: bool = False) -> np.ndarray:
     """
     Create an overcomplete haar dictionary for patches of size patch_size x patch_size.
     Use the trick of the tensor product between pure vertical/horizontal to create the dictionary then converts back to vectors.
     The resulting atoms in the dictionary are not normalized by default.
     """
+
+    n_patches_edge = np.sqrt(K).astype(int)
+    if not n_patches_edge**2 == K:
+        raise ValueError("K must be a perfect square.")
 
     # create first row and first column
     vert_freq = create_haar_row(n=patch_size)
@@ -104,7 +108,8 @@ def create_haar_dict(patch_size: int, normalize_atoms: bool = False, transpose_d
     haar_collection[patch_size:, patch_size:] = horz_freq[patch_size:, :] @ vert_freq[:, patch_size:] / patch_size
 
     # convert each patch to a n*n vector
-    n_patches_edge = haar_collection.shape[0] // patch_size
+    if n_patches_edge != haar_collection.shape[0] // patch_size:
+        raise ValueError("Uncomplete implementation for haar dictionary. Please set K=441.")
     n_patches = n_patches_edge ** 2
     haar_dict = np.zeros((patch_size**2, n_patches))
     for row in range(n_patches_edge):
@@ -168,7 +173,7 @@ if __name__ == "__main__":
     patch_size = 8
     K = 441
 
-    haar_dict = create_haar_dict(patch_size=patch_size, normalize_atoms=False, transpose_dict=False)
+    haar_dict = create_haar_dict(patch_size=patch_size, K=K, normalize_atoms=False, transpose_dict=False)
     assert haar_dict.shape == (patch_size**2, K)
     print(f"Haar dictionary for patch size {patch_size} was successfully created and has shape {haar_dict.shape} ")
 
