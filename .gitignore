@@ -1,0 +1,11 @@
+.DS_Store
+__pycache__/*
+.venv/
+
+images/*
+outputs/*
+synthetic_experiments/*
+patch_experiments/*
+*.pdf
+sandbox.ipynb
+trash.py
