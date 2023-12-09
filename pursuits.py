@@ -51,6 +51,8 @@ class SklearnOrthogonalMatchingPursuit(Pursuit):
         self.runtime = time() - self.runtime
 
         if return_coeffs:
+            if y.shape[1] == 1:
+                result = result.reshape(-1,1)
             return result
 
 
