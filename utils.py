@@ -123,6 +123,11 @@ def create_haar_dict(patch_size: int, K:int, normalize_atoms: bool = False, tran
                 vector_atom = vector_atom / np.linalg.norm(vector_atom)
             haar_dict[:,n_patches_edge*row+col] = vector_atom
 
+    haar_dict[:,0] = np.ones((patch_size**2,)) # set the first atom to the constant vector 1
+
+    # transform values in [-1,1] to [0,1]
+    haar_dict = (haar_dict + 1) / 2
+
     return haar_dict
 
 
@@ -164,6 +169,9 @@ def create_dct_dict(patch_size: int, K:int, normalize_atoms: bool = False, trans
             if normalize_atoms:
                 vector_atom = vector_atom / np.linalg.norm(vector_atom)
             dct_dict[:,n_patches_edge*row+col] = vector_atom
+
+    # transform values in [-1,1] to [0,1]
+    dct_dict = (dct_dict + 1) / 2
 
     return dct_dict
 

@@ -199,7 +199,7 @@ class PatchDictionary:
         
         # build the array containing all patches
         collection_edge = n_patches_edge * (self.patch_size + 1) - 1 # one line between each patch
-        collection_with_borders = -np.ones((collection_edge, collection_edge))
+        collection_with_borders = np.zeros((collection_edge, collection_edge))
         for patch_idx in range(n_patches):
             # row/col position of the patch in the collection
             row = (patch_idx // n_patches_edge)
