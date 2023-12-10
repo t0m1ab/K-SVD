@@ -56,8 +56,9 @@ class SyntheticDataGenerator:
         n_atoms = self.dict.shape[1]
         atoms_matching = -1 * np.ones(n_atoms)
 
+        # iter over each learned atom to find a matching atom in the designed dictionary
         for col_idx in range(n_atoms):
-            distance = np.ones(n_atoms) - np.abs(self.dict[:,col_idx].T @ designed_dict)
+            distance = np.ones(n_atoms) - np.abs(self.dict[:,col_idx].T @ designed_dict) # positive distances thks to normalization
             idx_matching = np.argmin(distance)
             if distance[idx_matching] < threshold:
                 atoms_matching[col_idx] = idx_matching
