@@ -340,14 +340,27 @@ class ImageProcessor():
         if return_masks:
             return self.masks
     
-    def reconstruct_image(self, dict_name: str, save_metrics: bool = False, save_rec_image: bool = False) -> None:
+    def reconstruct_image(self, dict_name: str = None, dict_path: str = None, save_metrics: bool = False, save_rec_image: bool = False) -> None:
 
         if self.signals is None or self.masks is None:
             raise ValueError("No image or masks loaded.")
+        
+        if dict_name is None and dict_path is None:
+            raise ValueError("You must specify either a dictionary name or a dictionary path.")
 
-        if dict_name not in self.dictionaries.keys():
+        if dict_path is None and dict_name not in self.dictionaries.keys():
             raise ValueError(f"Unknown dictionary name: {dict_name}. Available dictionaries are {self.dictionaries.keys()}.")
         
+        if dict_path is not None: # load dictionary from path and add it to the list of dictionaries
+            if not os.path.isfile(dict_path):
+                raise FileNotFoundError(f"The following file doesn't exist: {dict_path}")
+            dict_name = dict_path.split("/")[-1].replace(".npy", "") if dict_name is None else dict_name
+            self.dictionaries[dict_name] = PatchDictionary(
+                dict=np.load(dict_path),
+                dict_name=dict_name,
+            )
+            print(list(self.dictionaries.keys()), dict_name)
+
         # reconstruct missing values
         rec_signals, rec_metrics = reconstruct_missing_values(
             signals=self.signals,
@@ -399,11 +412,7 @@ class ImageProcessor():
         plt.savefig(fname=os.path.join(self.image_path, plotname), dpi=300)
         
 
-if __name__ == "__main__":
-
-    # 27 x 22 = 594
-    # 27 x 8 = 216
-    # 22 x 8 = 176
+def main():
 
     processor = ImageProcessor(
         patch_size=8,
@@ -420,19 +429,27 @@ if __name__ == "__main__":
         patch_dim=(27, 22),
     )
 
-    for dname in ["dct", "haar"]:
+    for dname in ["dct", "haar"]: # dct - haar - ksvd
 
-        for r in [0.2, 0.4, 0.5, 0.6, 0.7]:
+        for mratio in [0.2, 0.4, 0.5, 0.6, 0.7]:
 
             processor.mask_image(
-                missing_ratio=r,
+                missing_ratio=mratio,
                 save_masked_image=True,
             )
 
             processor.reconstruct_image(
                 dict_name=dname,
+                # dict_path="patch_experiments/ksvd_olivetti/ksvd_olivetti_iter=30.npy", # custom dictionary
                 save_metrics=True,
                 save_rec_image=True,
             )
         
     processor.plot_metrics()
+
+
+if __name__ == "__main__":
+    main()
+    # 27 x 22 = 594
+    # 27 x 8 = 216
+    # 22 x 8 = 176

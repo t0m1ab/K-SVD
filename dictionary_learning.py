@@ -1,32 +1,65 @@
+import os
 import numpy as np
+from pathlib import Path
 
 from pursuits import Pursuit, SklearnOrthogonalMatchingPursuit, OrthogonalMatchingPursuit
 
 
 class KSVD:
-    """ Perform K-SVD algorithm to learn a dictionary from a set of signals Y as well as the sparse representation of Y using the dictionary ."""
-    def __init__(self, n_atoms: int, sparsity: int, pursuit_method: Pursuit, use_dc_atom: bool = False, verbose: bool = False) -> None:
+    """ 
+    Perform K-SVD algorithm to learn a dictionary from a set of signals Y as well as the sparse representation of Y using the dictionary .
+    """
+    def __init__(
+        self, 
+        n_atoms: int, 
+        sparsity: int, 
+        pursuit_method: Pursuit, 
+        use_dc_atom: bool = False, 
+        verbose: bool = False,
+        dict: np.ndarray = None,
+    ) -> None:
         self.K = n_atoms
         self.sparsity = sparsity
         self.pursuit_method = pursuit_method
-        self.dict = None
+        self.dict = dict # if dict is not None, then the KSVD algorithm will start from this dictionary
         self.coeffs = None
         self.dc_atom = use_dc_atom # use the first atom of self.dict as the DC atom and never update it
         self.iteration = None
         self.residual_history = None
         self.verbose = verbose
     
-    def fit(self, y: np.ndarray, max_iter: int = None, tol: float = None, return_reconstruction: bool = False):
+    def fit(
+        self, 
+        y: np.ndarray, 
+        max_iter: int = None, 
+        tol: float = None, 
+        return_reconstruction: bool = False,
+        dict_name: str = None,
+        path: str = None,
+        save_chekpoints: bool = False,
+        checkpoint_step: int = 10,
+    ):
         
         if (max_iter is None and tol is None) or (max_iter is not None and tol is not None):
             raise ValueError("Either max_iter or tol must be specified as a stopping rule and you can't specify both.")
         
+        if save_chekpoints: # create checkpoints directory if it does not exist
+            dict_name = "ksvd_dict" if dict_name is None else dict_name
+            path = "outputs/" if path is None else path
+            checkpoint_dir = os.path.join(path, dict_name)
+            Path(checkpoint_dir).mkdir(parents=True, exist_ok=True)
+        
         n, N = y.shape # n_features, n_signals
-        self.dict = np.random.randn(n, self.K)
-        self.dict /= np.linalg.norm(self.dict, axis=0)
-        if self.dc_atom: # first atom is the DC atom and other atoms are zero mean
-            self.dict[:,0] = np.ones(n, dtype=float) / np.sqrt(n)
-            self.dict[:,1:] -= np.mean(self.dict[:,1:], axis=0)
+
+        # init dictionary from scratch if no dict checkpoint is provided
+        if self.dict is None:
+            self.dict = np.random.randn(n, self.K)
+            self.dict /= np.linalg.norm(self.dict, axis=0)
+            if self.dc_atom: # first atom is the DC atom and other atoms are zero mean
+                self.dict[:,0] = np.ones(n, dtype=float) / np.sqrt(n)
+                self.dict[:,1:] -= np.mean(self.dict[:,1:], axis=0)
+        elif self.dict.shape != (n, self.K):
+            raise ValueError(f"The shape of the dictionary was expected to be ({n}, {self.K}) but is {self.dict.shape} instead.")
 
         self.residual_history = []
         stopping_criterion = False
@@ -64,8 +97,15 @@ class KSVD:
 
             if self.verbose:
                 total_iter = f"/{max_iter}" if max_iter is not None else ""
-                print(f"# Iter {self.iteration}{total_iter} | residual = {residual}")
-        
+                print(f"# Iter {self.iteration}{total_iter} | loss = {residual}")
+            
+            if save_chekpoints and (self.iteration%checkpoint_step == 0):
+                checkpoint_name = f"{dict_name}_iter={self.iteration}.npy"
+                res_values_name = f"{dict_name}_iter={self.iteration}_res.npy"
+                np.save(os.path.join(checkpoint_dir, checkpoint_name), self.dict)
+                np.save(os.path.join(checkpoint_dir, res_values_name), np.array(self.residual_history))
+                print(f"Checkpoint [iter={self.iteration}] saved in {os.path.join(checkpoint_dir, checkpoint_name)}")
+
         if return_reconstruction:
             return self.dict @ self.coeffs
     
