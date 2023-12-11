@@ -185,6 +185,29 @@ class PatchDictionary:
         self.dict_name = dict_name if dict_name is not None else "Unknown dictionary"
         self.save_dir = save_dir if save_dir is not None else "outputs/"
     
+    def normalize_atoms(self, except_first_atom: bool = True) -> None:
+        """
+        DESCRIPTION:
+            Normalize each atom values in [0,1] by shifting to postive values and scaling to [0,1].
+        ARGS:
+            - except_first_atom: if True, don't normalize the first atom (e.g. DC atom).
+        """
+
+        if except_first_atom: # store original values of the first atom
+            first_atom = self.dict[:,0].copy()
+                
+        # shift all values to positive values
+        min_values = np.min(self.dict, axis=0)
+        self.dict -= min_values
+
+        # scale all values to [0,1]
+        max_values = np.max(self.dict, axis=0)
+        max_values[max_values == 0] = 1 # avoid division by zero
+        self.dict /= max_values
+
+        if except_first_atom:
+            self.dict[:,0] = first_atom
+        
     def __plot_dictionary_without_borders(self, ncol_plot: int, transpose_dict: bool, save: bool):
 
         if ncol_plot is None:
@@ -278,14 +301,14 @@ if __name__ == "__main__":
     data_engine.plot_random_patches(save=True)
     data_engine.plot_collection(n=500, nrow_plot=10, sort_variance=True, save=True)
 
-    # Haar basis (don't normalize atoms for visualization purpose)
+    # Haar dictionary (don't normalize atoms for visualization purpose)
     haar_dict = PatchDictionary(
         dict=create_haar_dict(patch_size=8, K=441, normalize_atoms=False, transpose_dict=False),
         dict_name="Haar",
     )
     haar_dict.plot_dictionary(borders=True, save=True)
 
-    # DCT basis (don't normalize atoms for visualization purpose)
+    # DCT dictionary (don't normalize atoms for visualization purpose)
     dct_dict = PatchDictionary(
         dict=create_dct_dict(patch_size=8, K=441, normalize_atoms=False, transpose_dict=True),
         dict_name="DCT",

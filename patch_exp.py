@@ -197,6 +197,11 @@ class KSVDProcessor():
                 save_chekpoints=save_chekpoints,
                 verbose=verbose,
             )
+
+        atom_means = np.mean(self.ksvd.dict, axis=0)
+        if np.max(atom_means[1:]) > 1e-8: # skip the DC atom
+            idx = np.argmax(atom_means[1:]) + 1
+            print(f"WARNING: Atom {idx} has an excessive mean value = {atom_means[idx]}")
         
         if save:
             save_dict_dir = os.path.join(self.save_dir, dict_name)
@@ -228,10 +233,10 @@ def main():
 
     # LEARN KSVD DICTIONARY
     ksvd_dict = processor.train_dictionary(
-        # n_atoms=441, # from scratch
-        checkpoint=os.path.join(save_dir, f"{dict_name}/{dict_name}.npy"), # from checkpoint
+        n_atoms=441, # from scratch
+        # checkpoint=os.path.join(save_dir, f"{dict_name}/{dict_name}.npy"), # from checkpoint
         sparsity=10,
-        max_iter=10,
+        max_iter=2,
         pursuit_method=OrthogonalMatchingPursuit,
         dict_name=dict_name,
         save_chekpoints=True,
@@ -239,12 +244,13 @@ def main():
     )
 
     # PLOT LEARNED KSVD DICTIONARY
-    basis = PatchDictionary(
+    ksvd_patch_dict = PatchDictionary(
         dict=ksvd_dict, # dict=np.load(os.path.join(save_dir, f"ksvd_{dataset_name}/ksvd_{dataset_name}.npy")),
         dict_name=dict_name,
         save_dir=os.path.join(save_dir, dict_name),
     )
-    basis.plot_dictionary(ncol_plot=21, save=True) # 21x21 = 441 atoms
+    ksvd_patch_dict.normalize_atoms(except_first_atom=True)
+    ksvd_patch_dict.plot_dictionary(ncol_plot=21, save=True) # 21x21 = 441 atoms
     
 
 if __name__ == "__main__":
