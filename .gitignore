@@ -4,8 +4,7 @@ __pycache__/*
 
 images/*
 outputs/*
-synthetic_experiments/*
-patch_experiments/*
+experiments/*
 *.pdf
 sandbox.ipynb
 trash.py

@@ -194,17 +194,3 @@ def create_dct_dict(patch_size: int, K:int, normalize_atoms: bool = False, trans
     dct_dict = (dct_dict + 1) / 2
 
     return dct_dict
-
-
-if __name__ == "__main__":
-
-    patch_size = 8
-    K = 441
-
-    haar_dict = create_haar_dict(patch_size=patch_size, K=K, normalize_atoms=False, transpose_dict=False)
-    assert haar_dict.shape == (patch_size**2, K)
-    print(f"Haar dictionary for patch size {patch_size} was successfully created and has shape {haar_dict.shape} ")
-
-    dct_dict = create_dct_dict(patch_size=patch_size, K=K, normalize_atoms=False, transpose_dict=True)
-    assert dct_dict.shape == (patch_size**2, K)
-    print(f"DCT dictionary for patch size {patch_size} was successfully created and has shape {dct_dict.shape} ")

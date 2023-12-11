@@ -283,11 +283,11 @@ class ImageProcessor():
         # create/load dictionaries
         self.dictionaries = {}
         self.dictionaries["dct"] = PatchDictionary(
-            dict=create_dct_dict(patch_size=self.patch_size, K=self.n_atoms, normalize_atoms=False),
+            dict=create_dct_dict(patch_size=self.patch_size, K=self.n_atoms, normalize_atoms=True),
             dict_name="dct",
         )
         self.dictionaries["haar"] = PatchDictionary(
-            dict=create_haar_dict(patch_size=self.patch_size, K=self.n_atoms, normalize_atoms=False),
+            dict=create_haar_dict(patch_size=self.patch_size, K=self.n_atoms, normalize_atoms=True),
             dict_name="haar",
         )
         if custom_dicts is not None:
