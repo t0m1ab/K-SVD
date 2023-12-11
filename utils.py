@@ -194,3 +194,42 @@ def create_dct_dict(patch_size: int, K:int, normalize_atoms: bool = False, trans
     dct_dict = (dct_dict + 1) / 2
 
     return dct_dict
+
+
+def plot_residuals(file_path: str, dict_name: str = None) -> None:
+    """
+    DESCRIPTION:
+        Create the plot of residuals recorded during a KSVD training.
+    ARGS:
+        - file_path: path to the .npy file containing the residuals
+        - dict_name: name of the trained dictionary
+    """
+
+    if not os.path.isfile(file_path):
+        raise ValueError(f"File not found: {file_path}")
+
+    # infer dict_name if not provided
+    file_dir, filename = split_path_and_filename(file_path)
+    if dict_name is None:
+        dict_name = filename.split(".")[0]
+        if dict_name.endswith("_res"):
+            dict_name = dict_name[:-4]
+
+    residuals = np.load(file_path)
+    
+    # plot
+    fig, ax = plt.subplots(figsize=(8, 6))
+    ax.plot(residuals, linestyle="-")
+    ax.set_title(f"Total residual value during {dict_name.upper()} training", size=16)
+    ax.set_xlabel("iteration")
+    ax.set_ylabel("residual")
+
+    # save
+    fig.savefig(os.path.join(file_dir, f"{dict_name}_residuals.png"), dpi=300)
+
+
+if __name__ == "__main__":
+    
+    # Plot residuals for a KSVD training
+    dict_name = "ksvd_olivetti"
+    plot_residuals(file_path=f"outputs/{dict_name}/{dict_name}_res.npy")

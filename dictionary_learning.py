@@ -7,47 +7,69 @@ from pursuits import Pursuit, SklearnOrthogonalMatchingPursuit, OrthogonalMatchi
 
 class KSVD:
     """ 
-    Perform K-SVD algorithm to learn a dictionary from a set of signals Y as well as the sparse representation of Y using the dictionary .
+    K-SVD algorithm to learn a dictionary from a set of signals as well as the sparse representation of these signals using the dictionary .
     """
     def __init__(
-        self, 
-        n_atoms: int, 
-        sparsity: int, 
-        pursuit_method: Pursuit, 
-        use_dc_atom: bool = False, 
-        verbose: bool = False,
-        dict: np.ndarray = None,
-    ) -> None:
+            self, 
+            n_atoms: int, 
+            sparsity: int, 
+            pursuit_method: Pursuit, 
+            use_dc_atom: bool = False, 
+            init_dict: np.ndarray = None,
+            dict_name: str = None,
+            save_dir: str = None,
+            verbose: bool = False,
+        ) -> None:
+        """
+        ARGS:
+            - n_atoms: number of atoms in the dictionary
+            - sparsity: max number of atoms used to reconstruct each signal
+            - pursuit_method: pursuit method used to solve the sparse coding problem
+            - use_dc_atom: if True, the first atom of the dictionary is the DC atom and is never updated
+            - init_dict: if not None, the KSVD algorithm will start from this dictionary
+            - dict_name: name given to the learned dictionary
+            - save_dir: directory where to save the learned dictionary
+        """
+
         self.K = n_atoms
         self.sparsity = sparsity
         self.pursuit_method = pursuit_method
-        self.dict = dict # if dict is not None, then the KSVD algorithm will start from this dictionary
+        self.dict = init_dict
+        self.dc_atom = use_dc_atom
+        self.dict_name = "ksvd_dict" if dict_name is None else dict_name
+        self.save_dir = "outputs/" if save_dir is None else save_dir
         self.coeffs = None
-        self.dc_atom = use_dc_atom # use the first atom of self.dict as the DC atom and never update it
         self.iteration = None
         self.residual_history = None
         self.verbose = verbose
+        self.is_fit = False
     
     def fit(
-        self, 
-        y: np.ndarray, 
-        max_iter: int = None, 
-        tol: float = None, 
-        return_reconstruction: bool = False,
-        dict_name: str = None,
-        path: str = None,
-        save_chekpoints: bool = False,
-        checkpoint_step: int = 10,
-    ):
+            self, 
+            y: np.ndarray, 
+            max_iter: int = None, 
+            tol: float = None, 
+            save_chekpoints: bool = False,
+            checkpoint_steps: int = 10,
+            return_reconstruction: bool = False,
+        ):
+        """
+        DESCRIPTION:
+            Learn a dictionary from the signals $y$ using the KSVD algorithm.
+        ARGS:
+            - y: matrix containing the signals (as column vectors) to learn the dictionary from
+            - max_iter: max number of iterations in the main loop of KSVD
+            - tol: tolerance value for the stopping criterion
+            - save_chekpoints: if True, save checkpoints of the dictionary during training
+            - checkpoint_steps: number of iterations of the main loop of KSVD between each checkpoint save
+            - return_reconstruction: if True, return the reconstruction of the signals using the learned dictionary
+        """
+
+        if self.is_fit:
+            raise ValueError("KSVD.fit() has already been run. If you run it again, you will loose the previous results.")
         
         if (max_iter is None and tol is None) or (max_iter is not None and tol is not None):
             raise ValueError("Either max_iter or tol must be specified as a stopping rule and you can't specify both.")
-        
-        if save_chekpoints: # create checkpoints directory if it does not exist
-            dict_name = "ksvd_dict" if dict_name is None else dict_name
-            path = "outputs/" if path is None else path
-            checkpoint_dir = os.path.join(path, dict_name)
-            Path(checkpoint_dir).mkdir(parents=True, exist_ok=True)
         
         n, N = y.shape # n_features, n_signals
 
@@ -60,6 +82,10 @@ class KSVD:
                 self.dict[:,1:] -= np.mean(self.dict[:,1:], axis=0)
         elif self.dict.shape != (n, self.K):
             raise ValueError(f"The shape of the dictionary was expected to be ({n}, {self.K}) but is {self.dict.shape} instead.")
+
+        if save_chekpoints: # create checkpoints directory if it does not exist
+            checkpoint_dir = os.path.join(self.save_dir, self.dict_name)
+            Path(checkpoint_dir).mkdir(parents=True, exist_ok=True)
 
         self.residual_history = []
         stopping_criterion = False
@@ -99,9 +125,9 @@ class KSVD:
                 total_iter = f"/{max_iter}" if max_iter is not None else ""
                 print(f"# Iter {self.iteration}{total_iter} | loss = {residual}")
             
-            if save_chekpoints and (self.iteration%checkpoint_step == 0):
-                checkpoint_name = f"{dict_name}_iter={self.iteration}.npy"
-                res_values_name = f"{dict_name}_iter={self.iteration}_res.npy"
+            if save_chekpoints and (self.iteration%checkpoint_steps == 0):
+                checkpoint_name = f"{self.dict_name}_iter={self.iteration}.npy"
+                res_values_name = f"{self.dict_name}_iter={self.iteration}_res.npy"
                 np.save(os.path.join(checkpoint_dir, checkpoint_name), self.dict)
                 np.save(os.path.join(checkpoint_dir, res_values_name), np.array(self.residual_history))
                 print(f"Checkpoint [iter={self.iteration}] saved in {os.path.join(checkpoint_dir, checkpoint_name)}")
@@ -110,6 +136,16 @@ class KSVD:
             return self.dict @ self.coeffs
     
     def check_stopping_rule(self, residual: float, max_iter: int, tol: float):
+        """
+        DESCRIPTION:
+            Return True if the stopping rule is satisfied, False otherwise.
+            If residual is None then the stopping rule is based on the number of iterations.
+            If tol is None then the stopping rule is based on the residual value.
+        ARGS:
+            - residual: current residual value
+            - max_iter: max number of iterations allowed for the main loop of KSVD
+            - tol: tolerance value for the stopping criterion
+        """
         self.iteration += 1
         if max_iter is not None:
             return self.iteration >= max_iter
@@ -120,15 +156,14 @@ class KSVD:
 
 if __name__ == "__main__":
 
-    from synthetic_data import SyntheticData
+    from synthetic_data import SyntheticDataGenerator
 
     # create synthetic data
-    data = SyntheticData(n_features=20)
+    data = SyntheticDataGenerator(n_features=20)
     data.create_synthetic_dictionary(n_atoms=50, normalize_columns=True, return_dict=False)
     y = data.create_synthetic_signals(n_signals=500, sparsity=3, noise_std=0.1, return_signals=True)
 
     # init KSVD
-    # ksvd = KSVD(n_atoms=50, sparsity=3, pursuit_method=SklearnOrthogonalMatchingPursuit, verbose=True)
     ksvd = KSVD(n_atoms=50, sparsity=3, pursuit_method=OrthogonalMatchingPursuit, verbose=True)
     print("KSVD method was successfully initialized!")
 
@@ -137,5 +172,5 @@ if __name__ == "__main__":
     print("KSVD method was successfully fitted!")
 
     # compute score
-    score = data.sucess_score(designed_dict=ksvd.dict, tol=0.01)
+    score = data.sucess_score(designed_dict=ksvd.dict, threshold=0.01)
     print(f"Success score = {score}/{ksvd.K}")
