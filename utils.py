@@ -4,6 +4,26 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
+def split_path_and_filename(file_path: str) -> (str, str):
+    """ Split a file path into its directory and filename. """
+    path = Path(file_path)
+    return path.parent, path.name
+
+
+def convert_255_to_unit_range(image: np.ndarray) -> np.ndarray:
+    """
+    Convert image with values in range [0,255] to image with values in range [-1,1].
+    """
+    return np.array(np.clip(image, a_min=0, a_max=255), dtype=np.float32) / 255
+
+
+def convert_unit_range_to_255(image: np.ndarray) -> np.ndarray:
+    """
+    Convert image with values in range [-1,1] to image with values in range [0,255].
+    """
+    return np.array(255 * np.clip(image, a_min=0.0, a_max=1.0), dtype=np.uint8)
+
+
 def plot_results_synthetic_exp(data_dir: str = None, n_runs: int = 50, success_threshold: float = 0.01, plot_groups: bool = False, group_size: int = 10):
     """ Plot the results of the synthetic experiment over different noise levels. """
 

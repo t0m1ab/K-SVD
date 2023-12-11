@@ -1,5 +1,5 @@
 """
-Code for reconstructing missing values in signals using a given dictionary and OMP algorithm.
+Reconstruction of missing values in an image using OMP with a given dictionary.
 """
 
 import os
@@ -10,8 +10,13 @@ from tqdm import tqdm
 from PIL import Image
 
 from pursuits import Pursuit, SklearnOrthogonalMatchingPursuit, OrthogonalMatchingPursuit
-from utils import create_dct_dict, create_haar_dict
 from patch_data import PatchDictionary
+from utils import (
+    convert_255_to_unit_range,
+    convert_unit_range_to_255,
+    create_dct_dict,
+    create_haar_dict,
+)
 
 
 def add_missing_values(signals: np.ndarray, r: float) -> np.ndarray:
@@ -45,7 +50,7 @@ def reconstruct_missing_values(
 
     # iter over each signal independently because dictionnary must be normalized 
     # for each signal differently (dependending a given mask)
-    for signal_idx in tqdm(range(N)):
+    for signal_idx in tqdm(range(N)) if verbose else range(N):
 
         # build signal with missing values
         y = signals[:,signal_idx]
@@ -62,8 +67,8 @@ def reconstruct_missing_values(
         modified_dict[masked_indexes, :] = 0.0 # set to zero masked elements ine each atom
         
         # run pursuit algorithm
-        pursuit = pursuit_method(dict=modified_dict, sparsity=sparsity, verbose=verbose)
-        signal_coeffs = pursuit.fit(y=y_masked.reshape((-1,1)), return_coeffs=True, verbose=verbose)
+        pursuit = pursuit_method(dict=modified_dict, sparsity=sparsity, verbose=False)
+        signal_coeffs = pursuit.fit(y=y_masked.reshape((-1,1)), return_coeffs=True)
         
         # each atom was renormalized with respect to non-masked elements in the signal
         # in order to reconstruct with the original dictionary, the sparse coefficients need to integrate this normalization        
@@ -78,8 +83,9 @@ def reconstruct_missing_values(
     rmse = np.sqrt(np.mean(reconstruction_errors**2))
     mae = np.mean(np.abs(signals - reconstructed_signals))
     metrics = {"rmse": rmse, "mae": mae}
-    print(f"RMSE ({N} samples) = {rmse}")
-    print(f"MAE ({N} samples) = {mae}")
+    if verbose:
+        print(f"RMSE ({N} samples) = {rmse}")
+        print(f"MAE ({N} samples) = {mae}")
 
     return reconstructed_signals, metrics
 
@@ -110,18 +116,17 @@ def image_to_patches(image: np.ndarray, patch_size: int, crop: bool = False) -> 
     return patches
 
 
-def load_image(filename: str, path: str = "./images", resize: tuple = None, save_version: bool = False) -> np.ndarray:
+def load_image(image_name: str, image_path: str, resize: tuple = None, save_dir: str = None) -> np.ndarray:
     """
     Load an image from the given path and filename.
     If resize is not None, resize the image to the given dimensions (widht, height).
     If save_version is True, save the resized image in the same directory with the suffix "_{height}x{width}".
     """
 
-    file_path = os.path.join(path, filename)
-    if not os.path.isfile(file_path):
-        raise FileNotFoundError(f"No file named {filename} in {path}")
+    if not os.path.isfile(image_path):
+        raise FileNotFoundError(f"File not found: {image_path}")
     
-    image = Image.open(file_path) #.convert("L") # grayscale conversion
+    image = Image.open(image_path) #.convert("L") # grayscale conversion
 
     if image.mode in ["RGB", "RGBA"]:
         image = image.convert("L") # grayscale conversion (L = Luminance in [0,255])
@@ -131,27 +136,14 @@ def load_image(filename: str, path: str = "./images", resize: tuple = None, save
     if resize is not None:
         image = image.resize(resize)
 
-    if save_version:
-        version_name = f"{filename.replace('.png','')}_{resize[1]}x{resize[0]}.png"
-        image.save(os.path.join(path, version_name))
+    if save_dir is not None:
+        Path(save_dir).mkdir(parents=True, exist_ok=True)
+        resized_file_name = f"{image_name}_{resize[1]}x{resize[0]}.png"
+        image.save(os.path.join(save_dir, resized_file_name))
 
-    np_image = convert_image_255_to_unit_range(image)
+    np_image = convert_255_to_unit_range(image)
 
     return np_image
-
-
-def convert_image_255_to_unit_range(image: np.ndarray) -> np.ndarray:
-    """
-    Convert image with values in range [0,255] to image with values in range [-1,1].
-    """
-    return np.array(np.clip(image, a_min=0, a_max=255), dtype=np.float32) / 255
-
-
-def convert_image_unit_range_to_255(image: np.ndarray) -> np.ndarray:
-    """
-    Convert image with values in range [-1,1] to image with values in range [0,255].
-    """
-    return np.array(255 * np.clip(image, a_min=0.0, a_max=1.0), dtype=np.uint8)
 
 
 def patches_to_image(patches: np.ndarray, patches_dim: tuple, return_image: bool = False, filename: str = None, path: str = "./images") -> None | np.ndarray:
@@ -179,7 +171,7 @@ def patches_to_image(patches: np.ndarray, patches_dim: tuple, return_image: bool
             patch = patches[:, row*n_patches_col + col].reshape((patch_size, patch_size))
             np_image[up:up+patch_size, left:left+patch_size] = patch
 
-    image = convert_image_unit_range_to_255(np_image)
+    image = convert_unit_range_to_255(np_image)
     
     if filename is not None:
         Path(path).mkdir(parents=True, exist_ok=True)
@@ -259,16 +251,36 @@ def fill_missing_values(
 
 class ImageProcessor():
 
-    def __init__(self, patch_size: int, n_atoms: int, pursuit_method: Pursuit, sparsity: int) -> None:
+    def __init__(
+            self, 
+            patch_size: int, 
+            n_atoms: int, 
+            pursuit_method: Pursuit, 
+            sparsity: int, 
+            custom_dicts: dict = None,
+            save_dir: str = None,
+            verbose: bool = False,
+        ) -> None:
+        """
+        ARGS:
+        - patch_size: size of the patches (e.g. 8 for 8x8 patches)
+        - n_atoms: number of atoms in the dictionary
+        - pursuit_method: pursuit algorithm to use for reconstruction
+        - sparsity: max number of atoms used to reconstruct each signal
+        - custom_dicts: define custom dictionaries to use for reconstruction (e.g. {"ksvd": "./outputs/ksvd.npy"})
+        - save_dir: directory where to save the result images and metrics
+        """
 
         # parameters for image processing
         self.patch_size = patch_size
         self.n_atoms = n_atoms
         self.pursuit_method = pursuit_method
         self.sparsity = sparsity
+        self.save_dir = "outputs/" if save_dir is None else save_dir
+        self.verbose = verbose
         self.metrics = {}
         
-        # create default dictionaries
+        # create/load dictionaries
         self.dictionaries = {}
         self.dictionaries["dct"] = PatchDictionary(
             dict=create_dct_dict(patch_size=self.patch_size, K=self.n_atoms, normalize_atoms=False),
@@ -278,21 +290,22 @@ class ImageProcessor():
             dict=create_haar_dict(patch_size=self.patch_size, K=self.n_atoms, normalize_atoms=False),
             dict_name="haar",
         )
+        if custom_dicts is not None:
+            for dname, dpath in custom_dicts.items():
+                if os.path.isfile(dpath):
+                    self.dictionaries[dname] = PatchDictionary(
+                        dict=np.load(dpath),
+                        dict_name=dname,
+                    )
+                else:
+                    raise FileNotFoundError(f"The following dictionary doesn't exist: {dpath}")
 
-        # temporary image data
+        # init temporary image data
         self.reset_image_data()
-        # self.image_name = None # without extension .png/.jpg/.jpeg
-        # self.image_path = None
-        # self.image = None
-        # self.patch_dim = None # (27,22) for 8x8 patches in the paper
-        # self.signals = None
-        # self.missing_ratio = None
-        # self.masks = None
-        # self.reconstructed_image = None
     
     def reset_image_data(self) -> None:
+        """ Reset temporary image data. """
         self.image_name = None
-        self.image_path = None
         self.image = None
         self.patch_dim = None
         self.signals = None
@@ -300,18 +313,24 @@ class ImageProcessor():
         self.masks = None
         self.reconstructed_image = None
 
-    def load_image(self, filename: str, path: str, patch_dim: tuple, return_patches: bool = False) -> None | np.ndarray:
+    def load_image(self, image_name: str, image_path: str, patch_dim: tuple, return_patches: bool = False) -> None | np.ndarray:
+        """
+        ARGS:
+        - image_name: name/tag of the image (e.g. "lena")
+        - image_path: path to the image file (e.g. "./examples/lena.png")
+        - patch_dim: dimension of the image in patches (e.g. (27, 22) for 27 rows and 22 columns of patches in the image)
+        - return_patches: if True, return the patch representation of the image as a numpy array
+        """
         
-        # load image (resize if necessary) with values in [0,1] and save its name and path
+        # load image (resize if necessary) with values in [0,1] and save the resized version in outputs/image_name/
         self.image = load_image(
-            filename=filename,
+            image_name=image_name,
+            image_path=image_path,
             resize=(patch_dim[1] * self.patch_size, patch_dim[0] * self.patch_size), # (width, height)
-            path=path,
-            save_version=False,
+            save_dir=os.path.join(self.save_dir, image_name),
         )
+        self.image_name = image_name
         self.patch_dim = patch_dim
-        self.image_name = filename.replace(".png", "").replace(".jpg", "").replace(".jpeg", "")
-        self.image_path = path
 
         # split images into non-overlapping patches and store them as column vectors in self.signals
         self.signals = image_to_patches(image=self.image, patch_size=self.patch_size)
@@ -320,6 +339,12 @@ class ImageProcessor():
             return self.signals
     
     def mask_image(self, missing_ratio: float, save_masked_image: bool = False, return_masks: bool = False) -> None | np.ndarray:
+        """
+        ARGS:
+        - missing_ratio: fraction of missing values in the image (e.g. 0.5 for 50% of missing values)
+        - save_masked_image: if True, save the masked image in directory {self.save_dir}}/{self.image_name}/
+        - return_masks: if True, return the mask for each patch as a numpy array
+        """
         
         if self.image is None:
             raise ValueError("No image loaded. Please load an image with load_image() before masking it.")
@@ -331,44 +356,39 @@ class ImageProcessor():
         if save_masked_image:
             patches_to_image(
                 patches=self.signals*self.masks,
-                patches_dim=self.patch_dim, 
-                return_image=False,
+                patches_dim=self.patch_dim,
                 filename=f"{self.image_name}_masked_r={self.missing_ratio}.png",
-                path=self.image_path,
+                path=os.path.join(self.save_dir, self.image_name),
+                return_image=False,
             )
         
         if return_masks:
             return self.masks
     
-    def reconstruct_image(self, dict_name: str = None, dict_path: str = None, save_metrics: bool = False, save_rec_image: bool = False) -> None:
+    def reconstruct_image(self, dict_name: str, save_metrics: bool = False, save_rec_image: bool = False) -> None:
+        """
+        ARGS:
+        - dict_name: name of the dictionary to use for reconstruction (e.g. "dct" or "haar")
+        - save_metrics: if True, save the metrics computed on the image reconstructions
+        - save_rec_image: if True, save the reconstructed image in directory {self.save_dir}}/{self.image_name}/
+        """
 
         if self.signals is None or self.masks is None:
             raise ValueError("No image or masks loaded.")
-        
-        if dict_name is None and dict_path is None:
-            raise ValueError("You must specify either a dictionary name or a dictionary path.")
 
-        if dict_path is None and dict_name not in self.dictionaries.keys():
+        if dict_name not in self.dictionaries.keys():
             raise ValueError(f"Unknown dictionary name: {dict_name}. Available dictionaries are {self.dictionaries.keys()}.")
-        
-        if dict_path is not None: # load dictionary from path and add it to the list of dictionaries
-            if not os.path.isfile(dict_path):
-                raise FileNotFoundError(f"The following file doesn't exist: {dict_path}")
-            dict_name = dict_path.split("/")[-1].replace(".npy", "") if dict_name is None else dict_name
-            self.dictionaries[dict_name] = PatchDictionary(
-                dict=np.load(dict_path),
-                dict_name=dict_name,
-            )
-            print(list(self.dictionaries.keys()), dict_name)
 
         # reconstruct missing values
+        if self.verbose:
+            print(f"Reconstructing image {self.image_name.upper()} with dictionary {dict_name.upper()} and missing ratio {self.missing_ratio}...")
         rec_signals, rec_metrics = reconstruct_missing_values(
             signals=self.signals,
             masks=self.masks,
             pursuit_method=self.pursuit_method,
             dictionary=self.dictionaries[dict_name].dict,
             sparsity=self.sparsity,
-            verbose=False,
+            verbose=self.verbose,
         )
 
         if save_metrics:
@@ -381,11 +401,15 @@ class ImageProcessor():
                 patches=rec_signals,
                 patches_dim=self.patch_dim, 
                 filename=f"{self.image_name}_{dict_name.upper()}_r={self.missing_ratio}.png",
-                path=self.image_path,
+                path=os.path.join(self.save_dir, self.image_name),
                 return_image=False,
             )
     
     def plot_metrics(self, dict_name: str = None) -> None:
+        """
+        ARGS:
+        - dict_name: name of the dictionary to plot the metrics for (e.g. "dct" or "haar"). If None, plot the metrics for all dictionaries.
+        """
 
         if dict_name is not None and not dict_name in self.metrics.keys():
             raise ValueError(f"Unknown dictionary name: {dict_name}. Metrics were computed only for dictionaries: {self.metrics.keys()}.")
@@ -405,31 +429,36 @@ class ImageProcessor():
 
         plt.xlabel("Ratio of missing pixels in the image")
         plt.ylabel("RMSE")
-        plt.title(f"Reconstruction of [{self.image_name}]", fontsize=16)
+        plt.title(f"Sparse reconstruction of {self.image_name.upper()}", fontsize=16)
         plt.legend(loc="upper left")
 
         plotname = f"rmse_{self.image_name}.png" if dict_name is None else f"rmse_{dict_name}_{self.image_name}.png"
-        plt.savefig(fname=os.path.join(self.image_path, plotname), dpi=300)
+        plt.savefig(fname=os.path.join(self.save_dir, self.image_name, plotname), dpi=300)
         
 
-def main():
+def main(image_name: str = "lena"):
 
+    # LOAD KSVD DICTIONARIES
     processor = ImageProcessor(
         patch_size=8,
         n_atoms=441,
         pursuit_method=OrthogonalMatchingPursuit,
         sparsity=10,
+        custom_dicts={
+            "ksvd_olivetti": "./patch_experiments/ksvd_olivetti/ksvd_olivetti_iter=30.npy",
+        },
+        verbose=True,
     )
 
-    image_name = "lena" # shannon - keogh - lena
-
+    # LOAD IMAGE
     processor.load_image(
-        filename=f"{image_name}.png",
-        path=f"./images/{image_name}/",
+        image_name=image_name,
+        image_path=f"./examples/{image_name}.png",
         patch_dim=(27, 22),
     )
 
-    for dname in ["dct", "haar"]: # dct - haar - ksvd
+    # RECONSTRUCT IMAGE USING DIFFERENT DICTIONARIES
+    for dname in processor.dictionaries.keys(): # dct - haar - ksvd_olivetti
 
         for mratio in [0.2, 0.4, 0.5, 0.6, 0.7]:
 
@@ -440,16 +469,13 @@ def main():
 
             processor.reconstruct_image(
                 dict_name=dname,
-                # dict_path="patch_experiments/ksvd_olivetti/ksvd_olivetti_iter=30.npy", # custom dictionary
                 save_metrics=True,
                 save_rec_image=True,
             )
-        
+    
+    # PLOT METRICS FOR ALL RECONSTRUCTIONS
     processor.plot_metrics()
 
 
 if __name__ == "__main__":
-    main()
-    # 27 x 22 = 594
-    # 27 x 8 = 216
-    # 22 x 8 = 176
+    main(image_name="lena") # AVAILABLE IMAGES: shannon - keogh - lena
