@@ -19,14 +19,32 @@ from patch_data import PatchDataGenerator, PatchDictionary
 class KSVDProcessor():
 
     def __init__(self, save_dir: str = None) -> None:
-        self.save_dir = save_dir if save_dir is not None else "patch_experiments/"
+        self.save_dir = save_dir if save_dir is not None else "outputs/"
+        self.reset_data()
+    
+    def reset_data(self) -> None:
         self.data_engine = None
         self.data = None
         self.n_patches = None
         self.patch_size = None
         self.ksvd = None
     
-    def generate_train_patches(self, dataset_name: str, n_patches: int, patch_size: int, return_data: bool = False) -> None | np.ndarray:
+    def generate_train_patches(
+            self, 
+            dataset_name: str, 
+            n_patches: int, 
+            patch_size: int, 
+            return_data: bool = False
+        ) -> None | np.ndarray:
+        """
+        DESCRIPTION:
+            Generate patches data from a given dataset.
+        ARGS:
+            - dataset_name: name of the dataset to use. Must be one of those defined in PatchDataGenerator.DATALOADERS keys.
+            - n_patches: number of patches to generate
+            - patch_size: size of the patches
+            - return_data: if True, return the generated patches
+        """
         
         # define data engine from dataset_name
         self.data_engine = PatchDataGenerator(dataset_name=dataset_name)
@@ -40,15 +58,21 @@ class KSVDProcessor():
             return self.data
     
     def __train_from_scratch(
-        self, 
-        dict_name: str,
-        n_atoms: int,
-        sparsity: int, 
-        max_iter: int,
-        pursuit_method: Pursuit,
-        save_chekpoints: bool,
-        verbose: bool = True,
-    ) -> None:
+            self, 
+            dict_name: str,
+            n_atoms: int,
+            sparsity: int, 
+            max_iter: int,
+            pursuit_method: Pursuit,
+            save_chekpoints: bool,
+            verbose: bool = True,
+        ) -> None:
+        """
+        DESCRIPTION:
+            Train a dictionary from scratch using KSVD method on self.data signals dataset.
+        ARGS:
+            [inherited from train_dictionary. See its docstring for details]
+        """
         
         if self.data is None:
             raise ValueError("You must generate the training patches before training a K-SVD dictionary from scratch.")
@@ -59,77 +83,98 @@ class KSVDProcessor():
             sparsity=sparsity,
             pursuit_method=pursuit_method,
             use_dc_atom=True,
-            verbose=verbose
+            dict_name=dict_name,
+            save_dir=self.save_dir,
+            verbose=verbose,
         )
         print(f"Training KSVD dictionary from scratch for {max_iter} iterations...")
         ksvd.fit(
             y=self.data, 
             max_iter=max_iter, 
-            return_reconstruction=False,
-            dict_name=dict_name,
-            path=self.save_dir,
             save_chekpoints=save_chekpoints,
+            return_reconstruction=False,
         )
         self.ksvd = ksvd
     
     def __train_from_checkpoint(
-        self, 
-        dict_name: str,
-        checkpoint_path: str,
-        sparsity: int,
-        max_iter: int,
-        pursuit_method: Pursuit,
-        save_chekpoints: bool,
-        verbose: bool = True,
-    ) -> None:
+            self, 
+            dict_name: str,
+            checkpoint: str,
+            sparsity: int,
+            max_iter: int,
+            pursuit_method: Pursuit,
+            save_chekpoints: bool,
+            verbose: bool = True,
+        ) -> None:
+        """
+        DESCRIPTION:
+            Train a dictionary from a checkpoint using KSVD method on self.data signals dataset.
+        ARGS:
+            [inherited from train_dictionary. See its docstring for details]
+        """
         
         if self.data is None:
             raise ValueError("You must generate the training patches before training a K-SVD dictionary from a checkpoint.")
 
         # load checkpoint
-        if not os.path.isfile(checkpoint_path):
-            raise ValueError(f"The checkpoint file '{checkpoint_path}' does not exist.")
-        checkpoint_dict = np.load(checkpoint_path)
+        if not os.path.isfile(checkpoint):
+            raise ValueError(f"The checkpoint file '{checkpoint}' does not exist.")
+        checkpoint_dict = np.load(checkpoint)
 
         # run KSVD
         n_atoms = checkpoint_dict.shape[1]
         ksvd = KSVD(
-            dict=checkpoint_dict,
             n_atoms=n_atoms, 
             sparsity=sparsity, 
             pursuit_method=pursuit_method, 
-            use_dc_atom=True, 
-            verbose=verbose
+            use_dc_atom=True,
+            init_dict=checkpoint_dict,
+            dict_name=dict_name,
+            save_dir=self.save_dir,
+            verbose=verbose,
         )
-        print(f"Training KSVD dictionary from checkpoint [{checkpoint_path}] for {max_iter} iterations...")
+        print(f"Training KSVD dictionary from checkpoint [{checkpoint}] for {max_iter} iterations...")
         ksvd.fit(
             y=self.data, 
             max_iter=max_iter, 
-            return_reconstruction=False,
-            dict_name=dict_name,
-            path=self.save_dir,
             save_chekpoints=save_chekpoints,
+            return_reconstruction=False,
         )
         self.ksvd = ksvd
     
-    def train_dictionary(self,
-        dict_name: str,
-        sparsity: int,
-        max_iter: int,
-        pursuit_method: Pursuit,
-        save_chekpoints: bool = True,
-        n_atoms: int = None,
-        checkpoint_path: str = None,
-        verbose: bool = True,
-        return_dict: bool = False,
-        save: bool = True,
-    ) -> None:
+    def train_dictionary(
+            self,
+            dict_name: str,
+            sparsity: int,
+            max_iter: int,
+            pursuit_method: Pursuit,
+            n_atoms: int = None,
+            checkpoint: str = None,
+            save_chekpoints: bool = True,
+            return_dict: bool = False,
+            save: bool = True,
+            verbose: bool = True,
+        ) -> None:
+        """
+        DESCRIPTION:
+            Train a dictionary using KSVD method on a given signals dataset.
+        ARGS:
+            - dict_name: name given to the dictionary to train
+            - sparsity: max number of atoms from the dictionary to represent each signal
+            - max_iter: max number of iterations in the main loop of KSVD
+            - pursuit_method: pursuit method to use in KSVD
+            - n_atoms: number of atoms in the the dictionary to train
+            - checkpoint: path to a dictionary checkpoint to init it before training
+            - save_chekpoints: if True, save checkpoints of the dictionary during training
+            - return_dict: if True, return the trained dictionary
+            - save: if True, save the trained dictionary and residual history
+        """
         
-        if n_atoms is None and checkpoint_path is None:
+        if n_atoms is None and checkpoint is None:
             raise ValueError("You must specify either the number of atoms or a checkpoint to train a dictionary.")
         
-        if n_atoms is not None and checkpoint_path is not None:
-            raise ValueError("You can't specify both the number of atoms and a checkpoint to train a dictionary")
+        if n_atoms is not None and checkpoint is not None:
+            raise ValueError("You can't specify both the number of atoms and a checkpoint to train a dictionary.")
 
         if n_atoms is not None:
             self.__train_from_scratch(
@@ -142,10 +187,10 @@ class KSVDProcessor():
                 verbose=verbose,
             )
         
-        elif checkpoint_path is not None:
+        elif checkpoint is not None:
             self.__train_from_checkpoint(
                 dict_name=dict_name,
-                checkpoint_path=checkpoint_path,
+                checkpoint=checkpoint,
                 sparsity=sparsity,
                 max_iter=max_iter,
                 pursuit_method=pursuit_method,
@@ -154,9 +199,10 @@ class KSVDProcessor():
             )
         
         if save:
-            Path(self.save_dir).mkdir(parents=True, exist_ok=True)
-            np.save(os.path.join(self.save_dir, f"patch_dict_K={n_atoms}.npy"), self.ksvd.dict)
-            np.save(os.path.join(self.save_dir, f"residual_hist_K={n_atoms}.npy"), np.array(self.ksvd.residual_history))
+            save_dict_dir = os.path.join(self.save_dir, dict_name)
+            Path(save_dict_dir).mkdir(parents=True, exist_ok=True)
+            np.save(os.path.join(save_dict_dir, f"{dict_name}.npy"), self.ksvd.dict)
+            np.save(os.path.join(save_dict_dir, f"{dict_name}_res.npy"), np.array(self.ksvd.residual_history))
         
         if return_dict:
             return self.ksvd.dict
@@ -164,34 +210,39 @@ class KSVDProcessor():
 
 def main():
 
-    save_dir="patch_experiments/"
+    # CHOOSE DATASET TO LEARN THE KSVD DICTIONARY
+    dataset_name = "olivetti"
+
+    save_dir = "outputs/"
+    dict_name = f"ksvd_{dataset_name}"
 
     processor = KSVDProcessor(save_dir=save_dir)
 
-    # generate training patches
+    # GENERATE TRAINNG PATCHES
     processor.generate_train_patches(
-        dataset_name="olivetti",
+        dataset_name=dataset_name,
         n_patches = 11_000,
         patch_size = 8,
         return_data=False,
     )
 
-    # learn KSVD dictionary
-    processor.train_dictionary(
-        n_atoms=441, # from scratch
-        # checkpoint_path=os.path.join(save_dir, "ksvd_olivetti/ksvd_olivetti_iter=30.npy"), # from checkpoint
+    # LEARN KSVD DICTIONARY
+    ksvd_dict = processor.train_dictionary(
+        # n_atoms=441, # from scratch
+        checkpoint=os.path.join(save_dir, f"{dict_name}/{dict_name}.npy"), # from checkpoint
         sparsity=10,
-        max_iter=50,
+        max_iter=10,
         pursuit_method=OrthogonalMatchingPursuit,
-        dict_name="ksvd_olivetti",
+        dict_name=dict_name,
         save_chekpoints=True,
+        return_dict=True,
     )
 
-    # plot KSVD dictionary
+    # PLOT LEARNED KSVD DICTIONARY
     basis = PatchDictionary(
-        # dict = np.load(os.path.join(save_dir, "ksvd_olivetti/ksvd_olivetti_iter=30.npy")),
-        dict_name = "KSVD",
-        save_dir = save_dir,
+        dict=ksvd_dict, # dict=np.load(os.path.join(save_dir, f"ksvd_{dataset_name}/ksvd_{dataset_name}.npy")),
+        dict_name=dict_name,
+        save_dir=os.path.join(save_dir, dict_name),
     )
     basis.plot_dictionary(ncol_plot=21, save=True) # 21x21 = 441 atoms
     

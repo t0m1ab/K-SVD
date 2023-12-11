@@ -82,6 +82,8 @@ class PatchDataGenerator:
         for patch_idx in range(n_patches):
             self.data[:,patch_idx] = patches_list[chosen_patches_idx[patch_idx]]
 
+        print(f"Patch dataset {self.dataset_name.upper()} created with n_patches={n_patches} and patch_size={patch_size}.")
+
         if return_data:
             return self.data
     
