@@ -4,6 +4,10 @@ import numpy as np
 class SyntheticDataGenerator:
     
     def __init__(self, n_features: int) -> None:
+        """
+        ARGS:
+            - n_features: dimension of the signals
+        """
         self.n_features = n_features
         self.dict = None
         self.coeffs = None
@@ -11,9 +15,15 @@ class SyntheticDataGenerator:
     
     def create_synthetic_dictionary(self, n_atoms: int, normalize_columns: bool = False, return_dict: bool = False):
         """ 
-        Create a synthetic dictionary of $n_atoms$ atoms of dimension $n_features$.
-        Each atom is a random vector of dimension $n_features$.
+        DESCRIPTION:
+            Create a synthetic dictionary of $n_atoms$ atoms of dimension $n_features$.
+            Each atom is a random vector of dimension $n_features$.
+        ARGS:
+            - n_atoms: number of atoms in the dictionary
+            - normalize_columns: if True, normalize the columns of the dictionary
+            - return_dict: if True, return the dictionary
         """
+
         self.dict = np.random.uniform(low=-1.0, high=1.0, size=(self.n_features, n_atoms))
         if normalize_columns:
             self.dict /= np.linalg.norm(self.dict, axis=0)
@@ -22,8 +32,14 @@ class SyntheticDataGenerator:
 
     def create_synthetic_signals(self, n_signals: int, sparsity: int, noise_std: float = 0, return_signals: bool = False):
         """ 
-        Create a synthetic set of $n_signals$ signals of dimension $n_features$.
-        Each signal is a sparse linear combination of $sparsity$ atoms from $dict$.
+        DESCRIPTION:
+            Create a synthetic set of $n_signals$ signals of dimension $n_features$.
+            Each signal is a sparse linear combination of $sparsity$ atoms from $dict$.
+        ARGS:
+            - n_signals: number of signals to create
+            - sparsity: number of atoms used to construct each signal
+            - noise_std: standard deviation of the noise added to the signals
+            - return_signals: if True, return the signals
         """
 
         if self.dict is None:
@@ -44,7 +60,11 @@ class SyntheticDataGenerator:
     
     def sucess_score(self, designed_dict: np.ndarray, threshold: float = 0.01):
         """ 
-        Compute the success score (see the paper for details) of $designed_dictionary$ with respect to the dictionary $self.dict$.
+        DESCRIPTION:
+            Compute the success score (see the paper for details) of $designed_dictionary$ with respect to the dictionary $self.dict$.
+        ARGS:
+            - designed_dict: the dictionary to test
+            - threshold: the threshold to use to determine if two atoms are matching
         """
 
         if self.dict is None:
@@ -69,11 +89,13 @@ class SyntheticDataGenerator:
 
 
 if __name__ == "__main__":
-        
+    
+    # Test the creation of a synthetic dictionary
     data_engine = SyntheticDataGenerator(n_features=6)
     data_engine.create_synthetic_dictionary(n_atoms=10, normalize_columns=True, return_dict=False)
     y = data_engine.create_synthetic_signals(n_signals=100, sparsity=3, noise_std=0.1, return_signals=True)
     print(f"Synthetic data with shape {y.shape} was successfully created!")
 
+    # Test the success score
     score = data_engine.sucess_score(designed_dict=data_engine.dict)
     assert score == data_engine.dict.shape[1], "The success score should be equal to the number of atoms in the dictionary when testing the original dictionary."

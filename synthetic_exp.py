@@ -31,7 +31,10 @@ def run_ksvd_synthetic_experiment(
         success_threshold: float,
     ) -> int:
     """
-    Run KSVD experiment on synthetic data and return the success score.
+    DESCRIPTION:
+        Run KSVD experiment on synthetic data and return the success score.
+    ARGS:
+        [inherited from mutli_run_ksvd_synthetic_experiment. See its docstring for details]
     """
 
     # create synthetic data
@@ -51,7 +54,8 @@ def run_ksvd_synthetic_experiment(
 
 def run_ksvd_synthetic_experiment_wrapper(_, **kwargs) -> int:
     """
-    Wrapper for $run_ksvd_synthetic_experiment$ to be used when multiprocessing with Pool.map for example.
+    DESCRIPTION:
+        Wrapper for $run_ksvd_synthetic_experiment$ to be used when multiprocessing with Pool.map for example.
     """
     return run_ksvd_synthetic_experiment(**kwargs)
 
@@ -63,14 +67,27 @@ def mutli_run_ksvd_synthetic_experiment(
         sparsity: int = 3,
         snr_db: float = 0,
         max_iter: int = 80,
-        n_runs: int = 50,
         pursuit_method: Pursuit = OrthogonalMatchingPursuit,
         success_threshold: float = 0.01,
+        n_runs: int = 50,
         n_process: int = None,
         save_dir: str = None,
     ):
     """
-    Run KSVD $n_runs$ times with the given parameters and return statistics on the success scores.
+    DESCRIPTION:
+        Run KSVD $n_runs$ times with the given parameters and return statistics on the success scores.
+    ARGS:
+        - n_features: number of features of the synthetic signals
+        - n_signals: number of synthetic signals
+        - n_atoms: number of atoms in the dictionary
+        - sparsity: number of atoms used to construct/reconstruct each signal
+        - snr_db: signal to noise ratio in dB
+        - max_iter: maximum number of iterations for main loop KSVD
+        - pursuit_method: pursuit method to use for KSVD
+        - success_threshold: max threshold to consider that a learned atom matches an original atom
+        - n_runs: number of time to perform the experiment
+        - n_process: number of processes to use to run the experiments in parallel
+        - save_dir: directory where to save the results
     """
 
     # define noise_std from noise_db considering that generating dictionary values follow U[-a,a]
@@ -124,7 +141,7 @@ def mutli_run_ksvd_synthetic_experiment(
 
 def main():
 
-    save_dir = "synthetic_experiments/"
+    save_dir = "outputs/synthetic_experiments/"
     n_runs = 50
 
     for snr_db in [10, 20, 30, None]: # None means no noise
@@ -140,7 +157,7 @@ def main():
             pursuit_method=OrthogonalMatchingPursuit,
             success_threshold=0.01,
             n_process=1,
-            save_dir = save_dir,
+            save_dir=save_dir,
         )
 
     plot_results_synthetic_exp(

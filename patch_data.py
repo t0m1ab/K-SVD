@@ -270,20 +270,20 @@ class PatchDictionary:
 
 if __name__ == "__main__":
     
-    ## OLIVETTI patch dataset (black and white face pictures)
+    # OLIVETTI patch dataset (black and white face pictures)
     data_engine = PatchDataGenerator(dataset_name="olivetti")
     data_engine.create_patch_dataset(patch_size=8, n_patches=1000, return_data=False)
     data_engine.plot_random_patches(save=True)
     data_engine.plot_collection(n=500, nrow_plot=10, sort_variance=True, save=True)
 
-    ## Haar basis (don't normalize atoms for visualization purpose)
+    # Haar basis (don't normalize atoms for visualization purpose)
     haar_dict = PatchDictionary(
         dict=create_haar_dict(patch_size=8, K=441, normalize_atoms=False, transpose_dict=False),
         dict_name="Haar",
     )
     haar_dict.plot_dictionary(borders=True, save=True)
 
-    ## DCT basis (don't normalize atoms for visualization purpose)
+    # DCT basis (don't normalize atoms for visualization purpose)
     dct_dict = PatchDictionary(
         dict=create_dct_dict(patch_size=8, K=441, normalize_atoms=False, transpose_dict=True),
         dict_name="DCT",
