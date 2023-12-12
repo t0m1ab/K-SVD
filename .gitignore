@@ -5,6 +5,7 @@ __pycache__/*
 images/*
 outputs/*
 experiments/*
+ArticularyWordRecognition/*
 *.pdf
 sandbox.ipynb
 trash.py
