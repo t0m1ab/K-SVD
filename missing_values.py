@@ -79,9 +79,9 @@ def reconstruct_missing_values(
         reconstructed_signals[:, signal_idx] = reconstruction.reshape(-1)
 
     # compute metrics
-    reconstruction_errors = np.sqrt((np.linalg.norm(signals - reconstructed_signals, axis=0)**2) / (n**2))
+    reconstruction_errors = signals - reconstructed_signals
     rmse = np.sqrt(np.mean(reconstruction_errors**2))
-    mae = np.mean(np.abs(signals - reconstructed_signals))
+    mae = np.mean(np.abs(reconstruction_errors))
     metrics = {"rmse": rmse, "mae": mae}
     if verbose:
         print(f"RMSE ({N} samples) = {rmse}")
@@ -381,7 +381,7 @@ class ImageProcessor():
 
         # reconstruct missing values
         if self.verbose:
-            print(f"Reconstructing image {self.image_name.upper()} with dictionary {dict_name.upper()} and missing ratio {self.missing_ratio}...")
+            print(f"Reconstructing image {self.image_name.upper()} with dictionary {dict_name.upper()} and missing ratio {self.missing_ratio} ...")
         rec_signals, rec_metrics = reconstruct_missing_values(
             signals=self.signals,
             masks=self.masks,
@@ -445,7 +445,7 @@ def main(image_name: str = "lena"):
         pursuit_method=OrthogonalMatchingPursuit,
         sparsity=10,
         custom_dicts={
-            "ksvd_olivetti": "./patch_experiments/ksvd_olivetti/ksvd_olivetti_iter=30.npy",
+            "ksvd_olivetti": "./outputs/ksvd_olivetti/ksvd_olivetti.npy",
         },
         verbose=True,
     )
