@@ -10,6 +10,7 @@ import numpy as np
 from scipy.io import arff
 import pandas as pd
 import matplotlib.pyplot as plt
+from sklearn.neighbors import KNeighborsClassifier as KNN
 
 from pursuits import Pursuit, SklearnOrthogonalMatchingPursuit, OrthogonalMatchingPursuit
 from dictionary_learning import KSVD
@@ -29,7 +30,7 @@ class AWRDataloader():
         self.dataset_name = "ArticularyWordRecognition" if dataset_name is  None else dataset_name
         
         self.dimension = None
-        self.split = None
+        self.splits = None
         self.data_filename = None
         self.signals = None
         self.labels = None
@@ -37,7 +38,7 @@ class AWRDataloader():
     def load(
             self, 
             dimension: int, 
-            split: str = "train", 
+            split: str = None, 
             return_data: bool = False
         ) -> None | tuple[np.ndarray, np.ndarray]:
         """ Load the corresponding set of signals. """
@@ -46,37 +47,43 @@ class AWRDataloader():
             raise ValueError(f"Dimension {dimension} not in range [1,9].")
         self.dimension = dimension
 
-        if not split in ["train", "test"]:
+        if split is not None and not split in ["train", "test"]:
             raise ValueError(f"Split {split} not in ['train', 'test'].")
-        self.split = split
+        self.splits = [split] if split is not None else ["train", "test"]
 
-        self.data_filename = f"ArticularyWordRecognitionDimension{self.dimension}_{self.split.upper()}.arff"
-        data_file_path = os.path.join(self.dataset_path, self.data_filename)
-
-        data = pd.DataFrame(arff.loadarff(data_file_path)[0]).to_numpy(dtype=np.float32)
-        assert data.shape == (275, 145)
-
-        self.signals = data[:, :-1].copy().T
-        self.labels = data[:, -1].copy()
-
-        print(f"Signals shape: {self.signals.shape}")
-        print(f"Labels shape: {self.labels.shape}")
+        self.signals = {}
+        self.labels = {}
+        for s in self.splits:
+            # define filename and path
+            data_filename = f"ArticularyWordRecognitionDimension{self.dimension}_{s.upper()}.arff"
+            data_file_path = os.path.join(self.dataset_path, data_filename)
+            # load data
+            data = pd.DataFrame(arff.loadarff(data_file_path)[0]).to_numpy(dtype=np.float32)
+            assert data.shape[1] == 145
+            # store data
+            self.signals[s] = data[:, :-1].copy().T
+            self.labels[s] = data[:, -1].copy()
+            print(f"{s.upper()} signals shape: {self.signals[s].shape}")
+            print(f"{s.upper()} labels shape: {self.labels[s].shape}")
 
         if return_data:
             return self.signals, self.labels
     
-    def plot_signals(self, pred: np.ndarray = None) -> None:
+    def plot_signals(self, split: str, pred: np.ndarray = None) -> None:
         """ Plot some signals from the dataset. """
 
-        if pred is not None and pred.shape != self.signals.shape:
-            raise ValueError(f"Predictions shape {pred.shape} does not match signals shape {self.signals.shape}.")
+        if pred is not None and pred.shape != self.signals[split].shape:
+            raise ValueError(f"Predictions shape {pred.shape} does not match signals shape {self.signals[split].shape}.")
+
+        random_index = np.random.choice(self.signals[split].shape[1], size=9, replace=False)
+        print(f"Plotting signals {random_index} from {split.upper()} split...")
 
         fig, ax = plt.subplots(3, 3, figsize=(20, 10))
-        for i in range(9):
-            ax[i//3, i%3].plot(signals[:,i], label="original")
+        for i, idx in enumerate(random_index):
+            ax[i//3, i%3].plot(self.signals[split][:,idx], label="original")
             if pred is not None:
-                ax[i//3, i%3].plot(pred[:,i], label="reconstruction")
-            ax[i//3, i%3].set_title(labels[i])
+                ax[i//3, i%3].plot(pred[:,idx], label="reconstruction")
+            ax[i//3, i%3].set_title(self.labels[split][idx])
         plt.legend()
         plt.tight_layout()
         plt.show()
@@ -89,18 +96,31 @@ if __name__ == "__main__":
         dataset_name="AWR"
     )
 
-    signals, labels = awr.load(dimension=2, split="train", return_data=True)
-
-    # print(signals.dtype)
-    # print(signals.shape)
-    # print(labels)
+    signals, labels = awr.load(dimension=2, split=None, return_data=True)
 
     # init KSVD
     ksvd = KSVD(n_atoms=25, sparsity=10, pursuit_method=OrthogonalMatchingPursuit, verbose=True)
     print("KSVD method was successfully initialized!")
 
     # fit KSVD
-    y_pred = ksvd.fit(y=signals, max_iter=100, return_reconstruction=True)
+    sparse_signals_train = ksvd.fit(y=signals["train"], max_iter=10, return_reconstruction=True)
     print("KSVD method was successfully fitted!")
 
-    awr.plot_signals(pred=y_pred)
+    # awr.plot_signals(split="train", pred=sparse_signals_train)
+
+    # use KSVD to build sparse representations of test signals
+    print(f"Test set has shape {signals['test'].shape}")
+    OMP = OrthogonalMatchingPursuit(sparsity=10, dict=ksvd.dict, verbose=True)
+    sparse_signals_test = ksvd.dict @ OMP.fit(y=signals["test"], return_coeffs=True)
+
+    # fit KNN
+    neigh = KNN(n_neighbors=5)
+    neigh.fit(sparse_signals_train.T, labels["train"].T)
+
+    # predict on test set using KNN
+    y_pred_test = neigh.predict(sparse_signals_test.T)
+
+    print(f"Class balance in test set: {np.bincount(labels['test'].astype(int))}")   
+    print(f"KNN accuracy = {np.mean(labels['test'] == y_pred_test):.3f}")
+
+
