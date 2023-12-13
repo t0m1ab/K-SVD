@@ -96,25 +96,25 @@ if __name__ == "__main__":
         dataset_name="AWR"
     )
 
-    signals, labels = awr.load(dimension=2, split=None, return_data=True)
+    signals, labels = awr.load(dimension=5, split=None, return_data=True)
 
     # init KSVD
-    ksvd = KSVD(n_atoms=25, sparsity=10, pursuit_method=OrthogonalMatchingPursuit, verbose=True)
+    ksvd = KSVD(n_atoms=25, sparsity=5, pursuit_method=OrthogonalMatchingPursuit, verbose=True)
     print("KSVD method was successfully initialized!")
 
     # fit KSVD
-    sparse_signals_train = ksvd.fit(y=signals["train"], max_iter=10, return_reconstruction=True)
+    sparse_signals_train = ksvd.fit(y=signals["train"], max_iter=50, return_reconstruction=True)
     print("KSVD method was successfully fitted!")
 
     # awr.plot_signals(split="train", pred=sparse_signals_train)
 
     # use KSVD to build sparse representations of test signals
     print(f"Test set has shape {signals['test'].shape}")
-    OMP = OrthogonalMatchingPursuit(sparsity=10, dict=ksvd.dict, verbose=True)
+    OMP = OrthogonalMatchingPursuit(sparsity=5, dict=ksvd.dict, verbose=True)
     sparse_signals_test = ksvd.dict @ OMP.fit(y=signals["test"], return_coeffs=True)
 
     # fit KNN
-    neigh = KNN(n_neighbors=5)
+    neigh = KNN(n_neighbors=3)
     neigh.fit(sparse_signals_train.T, labels["train"].T)
 
     # predict on test set using KNN
@@ -122,5 +122,10 @@ if __name__ == "__main__":
 
     print(f"Class balance in test set: {np.bincount(labels['test'].astype(int))}")   
     print(f"KNN accuracy = {np.mean(labels['test'] == y_pred_test):.3f}")
+
+    # print(labels["test"])
+    # print(y_pred_test)
+
+    # dim=5, n_atoms=25, sparsity=5, max_iter=50, KNN=3 => acc=0.72
 
 

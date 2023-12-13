@@ -236,7 +236,7 @@ def main():
         n_atoms=441, # from scratch
         # checkpoint=os.path.join(save_dir, f"{dict_name}/{dict_name}.npy"), # from checkpoint
         sparsity=10,
-        max_iter=2,
+        max_iter=50,
         pursuit_method=OrthogonalMatchingPursuit,
         dict_name=dict_name,
         save_chekpoints=True,
