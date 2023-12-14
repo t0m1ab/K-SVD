@@ -479,6 +479,53 @@ class ImageProcessor():
         plotname = f"rmse_{self.image_name}.png" if dict_name is None else f"rmse_{dict_name}_{self.image_name}.png"
         Path(os.path.join(self.save_dir, self.image_name)).mkdir(parents=True, exist_ok=True)
         plt.savefig(fname=os.path.join(self.save_dir, self.image_name, plotname), dpi=300)
+    
+    def plot_summary(self, mratios: list[float], dicts: list[str] = None) -> None:
+        """
+        DESCRITPION:
+            Plot reconstructions for 2 missing ratios (rows) and 3 reconstructions (columns)
+        ARGS:
+            - mratios: list of missing ratios to plot (e.g. [0.2, 0.5])
+            - dicts: list of dictionaries to plot (e.g. ["dct", "haar", "ksvd_olivetti"])
+        """
+
+        if len(mratios) != 2:
+            raise ValueError("Exactly 2 missing ratios have to be plotted for the summary plot.")
+        mratios = sorted(mratios)
+        if dicts is None:
+            dicts = ["original", "dct", "haar"]
+        elif len(dicts) != 3:
+            raise ValueError("Exactly 3 reconstructions have to be plotted for the summary plot.")
+
+        # plot reconstructions for each dictionary
+        fig, ax = plt.subplots(2, 4, figsize=(12,6))
+        for row, r in enumerate(mratios):
+            # masked images
+            ax[row, 0].imshow(self.data["mask"][r], cmap="gray")
+            ax[row ,0].set_title(f"{100*r:.0f}% missing pixels", fontsize=10)
+            ax[row, 0].set_axis_off()
+            # ax[row, 0].set_aspect("equal")
+            # reconstructed images
+            for column, dname in enumerate(dicts):
+                if dname == "original":
+                    img = self.image
+                    title = "ORIGINAL"
+                else:
+                    img = self.data["rec"][dname][r]
+                    title = f"{dname.upper()} reconstruction"
+                    title += f"\nMAE={self.metrics[dname][r]['mae']:.3f}"
+                    title += f"\nRMSE={self.metrics[dname][r]['rmse']:.3f}"
+                ax[row, column+1].imshow(img, cmap="gray")
+                ax[row, column+1].set_title(title, fontsize=10)
+                ax[row, column+1].set_axis_off()
+                # ax[row, column+1].set_aspect("equal")
+        fig.tight_layout()
+        # fig.subplots_adjust(wspace=0, hspace=0.3)   
+
+        plotname = f"summary_{self.image_name}.png"
+        Path(os.path.join(self.save_dir, self.image_name)).mkdir(parents=True, exist_ok=True)
+        plt.savefig(fname=os.path.join(self.save_dir, self.image_name, plotname), dpi=300)
+
         
 
 def main(image_name: str = "lena", save_all_images: bool = True):
@@ -524,7 +571,10 @@ def main(image_name: str = "lena", save_all_images: bool = True):
     processor.plot_metrics()
 
     # PLOT SUMMARY OF RECONSTRUCTIONS
-    print("TO BE DONE...")
+    processor.plot_summary(
+        mratios=[0.5, 0.7],
+        dicts=["ksvd_olivetti", "dct", "haar"],
+    )
 
 
 if __name__ == "__main__":
