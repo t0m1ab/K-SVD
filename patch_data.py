@@ -182,31 +182,22 @@ class PatchDictionary:
         self.patch_size = int(np.sqrt(dict.shape[0]))
         if self.patch_size ** 2 != dict.shape[0]:
             raise ValueError("The dictionary doesn't contain square patches in its columns.")
-        self.dict_name = dict_name if dict_name is not None else "Unknown dictionary"
+        self.dict_name = dict_name if dict_name is not None else "unknown dict"
         self.save_dir = save_dir if save_dir is not None else "outputs/"
     
-    def normalize_atoms(self, except_first_atom: bool = True) -> None:
+    def get_plot_dict(self) -> None:
         """
         DESCRIPTION:
-            Normalize each atom values in [0,1] by shifting to postive values and scaling to [0,1].
+           Unormalize each atom values by a forcing their biggest absolute value to be 1.
+           Only useful for visualization purpose because atoms need to be normalized for OMP and KSVD.
         ARGS:
             - except_first_atom: if True, don't normalize the first atom (e.g. DC atom).
         """
 
-        if except_first_atom: # store original values of the first atom
-            first_atom = self.dict[:,0].copy()
-                
-        # shift all values to positive values
-        min_values = np.min(self.dict, axis=0)
-        self.dict -= min_values
-
-        # scale all values to [0,1]
-        max_values = np.max(self.dict, axis=0)
-        max_values[max_values == 0] = 1 # avoid division by zero
-        self.dict /= max_values
-
-        if except_first_atom:
-            self.dict[:,0] = first_atom
+        max_abs_values = np.max(np.abs(self.dict), axis=0)
+        plot_dict = self.dict / max_abs_values
+        plot_dict = (plot_dict + 1) / 2
+        return plot_dict
         
     def __plot_dictionary_without_borders(self, ncol_plot: int, transpose_dict: bool, save: bool):
 
@@ -217,12 +208,16 @@ class PatchDictionary:
         
         nrow = (self.n_atoms // ncol_plot) + 1 if (self.n_atoms % ncol_plot) > 0 else (self.n_atoms // ncol_plot)
 
+        # saturate atoms and shift values for visualization purpose
+        plot_dict = self.get_plot_dict()
+
         # build the array containing all patches
         collection = np.ndarray((nrow*self.patch_size, ncol_plot*self.patch_size))
         for idx in range(self.n_atoms):
             row = (idx // ncol_plot) * self.patch_size
             col = (idx % ncol_plot) * self.patch_size
-            patch = self.dict[:,idx].reshape((self.patch_size, self.patch_size))
+            # set patch values in [0,1] for visualization purpose
+            patch = plot_dict[:,idx].reshape((self.patch_size, self.patch_size))
             if not transpose_dict:
                 collection[row:row+self.patch_size, col:col+self.patch_size] = patch
             else:
@@ -250,6 +245,9 @@ class PatchDictionary:
         if n_patches_edge ** 2 != n_patches:
             raise ValueError("The dictionary must contain a square number of patches.")
         
+        # saturate atoms and shift values for visualization purpose
+        plot_dict = self.get_plot_dict()
+        
         # build the array containing all patches
         collection_edge = n_patches_edge * (self.patch_size + 1) - 1 # one line between each patch
         collection_with_borders = np.zeros((collection_edge, collection_edge))
@@ -260,8 +258,8 @@ class PatchDictionary:
             # pixel position of the patch in the collection
             up = row * self.patch_size
             left = col * self.patch_size
-            # extract patch from the dictionary and copy it in the collection with borders
-            patch = self.dict[:, patch_idx].reshape((self.patch_size, self.patch_size))
+            # set patch values in [0,1] for visualization purpose
+            patch = plot_dict[:, patch_idx].reshape((self.patch_size, self.patch_size))
             if not transpose_dict:
                 collection_with_borders[up+row:up+row+self.patch_size, left+col:left+col+self.patch_size] = patch
             else:
@@ -292,6 +290,17 @@ class PatchDictionary:
         else:
             self.__plot_dictionary_with_borders(transpose_dict=transpose_dict, save=save)
 
+    def save_dict(self, filename: str = None, normalize_atoms: bool = True) -> None:
+
+        if filename is None:
+            filename = self.dict_name.lower().replace(' ','-') + "_dict.npy"
+
+        if normalize_atoms:
+            dict_to_save = self.dict / np.linalg.norm(self.dict, axis=0)
+
+        Path(self.save_dir).mkdir(parents=True, exist_ok=True)
+        np.save(os.path.join(self.save_dir, filename), dict_to_save)
+
 
 if __name__ == "__main__":
     
@@ -307,6 +316,7 @@ if __name__ == "__main__":
         dict_name="Haar",
     )
     haar_dict.plot_dictionary(borders=True, save=True)
+    haar_dict.save_dict(normalize_atoms=True)
 
     # DCT dictionary (don't normalize atoms for visualization purpose)
     dct_dict = PatchDictionary(
@@ -314,3 +324,4 @@ if __name__ == "__main__":
         dict_name="DCT",
     )
     dct_dict.plot_dictionary(borders=True, save=True)
+    dct_dict.save_dict(normalize_atoms=True)

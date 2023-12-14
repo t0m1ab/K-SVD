@@ -77,11 +77,12 @@ class KSVD:
         if self.dict is None:
             self.dict = np.random.randn(n, self.K)
             self.dict /= np.linalg.norm(self.dict, axis=0)
-            if self.dc_atom: # first atom is the DC atom and other atoms are zero mean
-                self.dict[:,0] = np.ones(n, dtype=float) / np.sqrt(n)
-                self.dict[:,1:] -= np.mean(self.dict[:,1:], axis=0)
         elif self.dict.shape != (n, self.K):
             raise ValueError(f"The shape of the dictionary was expected to be ({n}, {self.K}) but is {self.dict.shape} instead.")
+
+        if self.dc_atom: # first atom is the DC atom and other atoms are zero mean
+            self.dict[:,0] = np.ones(n, dtype=float) / np.sqrt(n)
+            self.dict[:,1:] -= np.mean(self.dict[:,1:], axis=0)
 
         if save_chekpoints: # create checkpoints directory if it does not exist
             checkpoint_dir = os.path.join(self.save_dir, self.dict_name)

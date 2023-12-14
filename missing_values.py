@@ -297,8 +297,10 @@ class ImageProcessor():
         if custom_dicts is not None:
             for dname, dpath in custom_dicts.items():
                 if os.path.isfile(dpath):
+                    custom_dict = np.load(dpath)
+                    custom_dict = custom_dict / np.linalg.norm(custom_dict, axis=0) # normalize atoms just in case
                     self.dictionaries[dname] = PatchDictionary(
-                        dict=np.load(dpath),
+                        dict=custom_dict,
                         dict_name=dname,
                     )
                 else:
@@ -417,11 +419,15 @@ class ImageProcessor():
         # reconstruct missing values
         if self.verbose:
             print(f"Reconstructing image {self.image_name.upper()} with dictionary {dict_name.upper()} and missing ratio {self.missing_ratio} ...")
+        
+        # shift to positive values to avoid non convergence of SVD in pursuit algorithm
+        dictionary = (self.dictionaries[dict_name].dict + 1) / 2
+        
         rec_signals, rec_metrics = reconstruct_missing_values(
             signals=self.signals,
             masks=self.masks,
             pursuit_method=self.pursuit_method,
-            dictionary=self.dictionaries[dict_name].dict,
+            dictionary=dictionary,
             sparsity=self.sparsity,
             verbose=self.verbose,
         )
@@ -485,6 +491,8 @@ def main(image_name: str = "lena", save_all_images: bool = True):
         sparsity=10,
         custom_dicts={
             "ksvd_olivetti": "./outputs/ksvd_olivetti/ksvd_olivetti.npy",
+            # "ksvd_olivetti_init-dct": "./outputs/ksvd_olivetti_init-dct/ksvd_olivetti_init-dct.npy",
+            # "ksvd_olivetti_init-haar": "./outputs/ksvd_olivetti_init-haar/ksvd_olivetti_init-haar.npy",
         },
         verbose=True,
     )
@@ -520,4 +528,4 @@ def main(image_name: str = "lena", save_all_images: bool = True):
 
 
 if __name__ == "__main__":
-    main(image_name="keogh") # AVAILABLE IMAGES: shannon - keogh - lena
+    main(image_name="lena") # AVAILABLE IMAGES: shannon - keogh - lena

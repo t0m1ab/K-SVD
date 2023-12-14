@@ -120,6 +120,7 @@ class KSVDProcessor():
         if not os.path.isfile(checkpoint):
             raise ValueError(f"The checkpoint file '{checkpoint}' does not exist.")
         checkpoint_dict = np.load(checkpoint)
+        checkpoint_dict = checkpoint_dict / np.linalg.norm(checkpoint_dict, axis=0) # normalize atoms
 
         # run KSVD
         n_atoms = checkpoint_dict.shape[1]
@@ -249,8 +250,7 @@ def main():
         dict_name=dict_name,
         save_dir=os.path.join(save_dir, dict_name),
     )
-    ksvd_patch_dict.normalize_atoms(except_first_atom=True)
-    ksvd_patch_dict.plot_dictionary(ncol_plot=21, save=True) # 21x21 = 441 atoms
+    ksvd_patch_dict.plot_dictionary(ncol_plot=21, borders=True, save=True) # 21x21 = 441 atoms
     
 
 if __name__ == "__main__":

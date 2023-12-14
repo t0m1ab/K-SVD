@@ -24,8 +24,16 @@ def convert_unit_range_to_255(image: np.ndarray) -> np.ndarray:
     return np.array(255 * np.clip(image, a_min=0.0, a_max=1.0), dtype=np.uint8)
 
 
-def plot_results_synthetic_exp(data_dir: str = None, n_runs: int = 50, success_threshold: float = 0.01, plot_groups: bool = False, group_size: int = 10):
-    """ Plot the results of the synthetic experiment over different noise levels. """
+def plot_results_synthetic_exp(
+        data_dir: str = None, 
+        n_runs: int = 50, 
+        success_threshold: float = 0.01, 
+        plot_groups: bool = False, 
+        group_size: int = 10
+    ) -> None:
+    """
+    Plot the results of the synthetic experiment over different noise levels.
+    """
 
     snr_levels = {"no_noise": 0, "10dB": 10, "20dB": 20, "30dB": 30}
     fig, ax = plt.subplots(figsize=(10, 5))
@@ -106,11 +114,22 @@ def create_haar_row(n: int) -> np.ndarray:
     return haar_row
 
         
-def create_haar_dict(patch_size: int, K:int, normalize_atoms: bool = False, transpose_dict: bool = False) -> np.ndarray:
+def create_haar_dict(
+        patch_size: int, 
+        K:int, 
+        normalize_atoms: bool = False, 
+        transpose_dict: bool = False
+    ) -> np.ndarray:
     """
-    Create an overcomplete haar dictionary for patches of size patch_size x patch_size.
-    Use the trick of the tensor product between pure vertical/horizontal to create the dictionary then converts back to vectors.
-    The resulting atoms in the dictionary are not normalized by default.
+    DESCRIPTION:
+        Create an overcomplete haar dictionary containing K patches of size patch_size x patch_size.
+        Use the trick of the tensor product between pure vertical/horizontal to create the dictionary then converts back to vectors.
+        The resulting atoms in the dictionary have values in [-1,1] and are not normalized by default.
+    ARGS:
+        - patch_size: size of the patches
+        - K: number of atoms in the dictionary
+        - normalize_atoms: if True, each atom will have a unit norm
+        - transpose_dict: if True, return the transposed order of the dictionary 
     """
 
     n_patches_edge = np.sqrt(K).astype(int)
@@ -139,14 +158,12 @@ def create_haar_dict(patch_size: int, K:int, normalize_atoms: bool = False, tran
             if transpose_dict:
                 left, up = up, left
             vector_atom = haar_collection[up:up+patch_size, left:left+patch_size].reshape(-1)
-            if normalize_atoms:
-                vector_atom = vector_atom / np.linalg.norm(vector_atom)
             haar_dict[:,n_patches_edge*row+col] = vector_atom
 
     haar_dict[:,0] = np.ones((patch_size**2,)) # set the first atom to the constant vector 1
 
-    # transform values in [-1,1] to [0,1]
-    haar_dict = (haar_dict + 1) / 2
+    if normalize_atoms: # force each atom to have a unit norm
+        haar_dict = haar_dict / np.linalg.norm(haar_dict, axis=0)
 
     return haar_dict
 
@@ -160,11 +177,22 @@ def create_dct_row(n: int, freq_range: int) -> np.ndarray:
     return table.reshape((1,-1))
 
 
-def create_dct_dict(patch_size: int, K:int, normalize_atoms: bool = False, transpose_dict: bool = False) -> np.ndarray:
+def create_dct_dict(
+        patch_size: int, 
+        K:int, 
+        normalize_atoms: bool = False,
+        transpose_dict: bool = False
+    ) -> np.ndarray:
     """
-    Create an overcomplete dct dictionary containing K patches of size patch_size x patch_size.
-    Use the trick of the tensor product between pure vertical/horizontal to create the dictionary then converts back to vectors.
-    The resulting atoms in the dictionary are not normalized by default.
+    DESCRIPTION:
+        Create an overcomplete dct dictionary containing K patches of size patch_size x patch_size.
+        Use the trick of the tensor product between pure vertical/horizontal to create the dictionary then converts back to vectors.
+        The resulting atoms in the dictionary have values in [-1,1] and are not normalized by default.
+    ARGS:
+        - patch_size: size of the patches
+        - K: number of atoms in the dictionary
+        - normalize_atoms: if True, each atom will have a unit norm
+        - transpose_dict: if True, return the transposed order of the dictionary 
     """
 
     n_patches_edge = np.sqrt(K).astype(int)
@@ -186,12 +214,10 @@ def create_dct_dict(patch_size: int, K:int, normalize_atoms: bool = False, trans
             if transpose_dict:
                 left, up = up, left
             vector_atom = dct_collection[up:up+patch_size, left:left+patch_size].reshape(-1)
-            if normalize_atoms:
-                vector_atom = vector_atom / np.linalg.norm(vector_atom)
             dct_dict[:,n_patches_edge*row+col] = vector_atom
 
-    # transform values in [-1,1] to [0,1]
-    dct_dict = (dct_dict + 1) / 2
+    if normalize_atoms: # force each atom to have a unit norm
+        dct_dict = dct_dict / np.linalg.norm(dct_dict, axis=0)
 
     return dct_dict
 
