@@ -26,16 +26,35 @@ def convert_unit_range_to_255(image: np.ndarray) -> np.ndarray:
 
 def plot_results_synthetic_exp(
         data_dir: str = None, 
-        n_runs: int = 50, 
+        n_runs: int = 50,
+        noise_levels: list = None,
         success_threshold: float = 0.01, 
         plot_groups: bool = False, 
         group_size: int = 10
     ) -> None:
     """
-    Plot the results of the synthetic experiment over different noise levels.
+    DESCRIPTION:
+        Plot the results of the synthetic experiment for different noise levels.
+    ARGS:
+        - data_dir: path to the folder containing the results
+        - n_runs: number of runs for each noise level
+        - noise_levels: list of noise levels to plot (None means default noise levels apply: [None, 10, 20, 30])
+        - success_threshold: threshold for the success score
+        - plot_groups: if True, plot the mean success score for groups of 'group_size' runs
+        - group_size: number of runs to group together if plot_groups is True
     """
+    
+    # noise level labels traduction
+    if noise_levels is None:
+        snr_levels = {"no_noise": 0, "10dB": 10, "20dB": 20, "30dB": 30}
+    else:
+        snr_levels = {}
+        for level in noise_levels:
+            if level is None:
+                snr_levels["no_noise"] = 0
+            else:
+                snr_levels[f"{str(level)}dB"] = level
 
-    snr_levels = {"no_noise": 0, "10dB": 10, "20dB": 20, "30dB": 30}
     fig, ax = plt.subplots(figsize=(10, 5))
 
     for snr_label, snr_level in snr_levels.items():
