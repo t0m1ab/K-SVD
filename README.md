@@ -21,10 +21,10 @@
 * `examples/`: contains example images to run the missing values experiments
 
 ![patches_collection](figures/olivetti_collection_n=500.png)
-**Example of patches extarcted from the Olivetti dataset**
+**Example of patches extracted from the Olivetti dataset**
 
 ![ksvd_dict](figures/ksvd_olivetti_dict.png)
 **Learned KSVD dictionary**
 
 ![summary_shannon](figures/summary_shannon.png)
-**Reconstruction example**
+**Comparison of reconstruction using the learned KSVD dictionary with overcomplete DCT or HAAR dictionaries**
