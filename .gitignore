@@ -7,5 +7,6 @@ outputs/*
 experiments/*
 ArticularyWordRecognition/*
 *.pdf
+*.csv
 sandbox.ipynb
 trash.py
