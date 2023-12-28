@@ -3,6 +3,9 @@ from sklearn.datasets import fetch_olivetti_faces
 import matplotlib.pyplot as plt
 import os
 from pathlib import Path
+from time import time
+from datasets import load_dataset
+from collections import defaultdict
 
 from utils import create_haar_dict, create_dct_dict
 
@@ -28,10 +31,62 @@ def extract_all_patches(image: np.ndarray, patch_size: int) -> list:
     return patches
 
 
+def load_olivetti_data() -> np.ndarray:
+    """ 
+    Load Olivetti 64x64 images from Sklearn datasets.
+    Returns images as vectors with values in [0,1].
+    Output array of shape (n_images, image_size, image_size).
+    """
+    return fetch_olivetti_faces(shuffle=True).images # random_state=42
+
+
+def load_mnist_data(split: str, n_per_class: int = None) -> np.ndarray:
+    """ 
+    Load MNIST 28x28 images from HuggingFace datasets.
+    Returns images as vectors with values in [0,1].
+    Output array of shape (n_images, image_size, image_size).
+    """
+
+    if split not in ["train", "test"]:
+        raise ValueError(f"Unknown split '{split}': it must be either 'train' or 'test'.")
+    
+    dataset = load_dataset("mnist")[split]
+    image_size = np.array(dataset[0]["image"]).shape[0]
+
+    labels = np.array([x["label"] for x in dataset])
+    total_labels_count = np.bincount(labels)
+    min_count = np.min(total_labels_count)
+    if n_per_class is None:
+        n_per_class = min_count
+    else:
+        if n_per_class > min_count:
+            raise ValueError(f"n_per_class cannot be higher than {min_count}.")
+    
+    class_to_index = defaultdict(list)
+    for idx, label in enumerate(labels):
+        class_to_index[label].append(idx)
+    n_classes = len(class_to_index.keys())
+    
+    selected_indexes = {
+        label: np.random.choice(class_to_index[label], n_per_class, replace=False)
+        for label in class_to_index.keys()
+    }
+
+    data = np.zeros((n_classes*n_per_class, image_size, image_size))
+    for label_idx, (label, indexes) in enumerate(selected_indexes.items()):
+        for c, idx in enumerate(indexes):
+            data[label_idx*n_per_class + c, :, :] = np.array(dataset[int(idx)]["image"], dtype=np.float32)
+    
+    data = data / 255.0
+
+    return data
+
+
 class PatchDataGenerator:
 
     DATALOADERS = {
-        "olivetti": lambda : fetch_olivetti_faces(shuffle=True, random_state=42),
+        "olivetti": load_olivetti_data,
+        "mnist": lambda: load_mnist_data(split="train", n_per_class=1000),
     }
 
     @classmethod
@@ -54,35 +109,42 @@ class PatchDataGenerator:
         self.n_patches = None
         self.data = None
   
-    def create_patch_dataset(self, patch_size: int, n_patches: int, return_data: bool = False) -> None | np.ndarray:
+    def create_patch_dataset(self, patch_size: int = None, n_patches: int = None, return_data: bool = False) -> None | np.ndarray:
         """ 
         ARGS:
-            - patch_size: size of the patches to extract from the images.
-            - n_patches: number of patches to extract from the images.
+            - patch_size: size of the patches to extract from the images (full image if None).
+            - n_patches: number of patches to extract from the images (all possible patches if None).
             - return_data: if True, return the patch dataset.
         """
+
+        start_time = time()
 
         if self.data is not None:
             raise ValueError("A patch dataset was already created and is stored in self.data.")
 
-        self.patch_size = patch_size
-        self.n_patches = n_patches
+        dataset = self.data_loader()
+        self.patch_size = min(dataset.shape[1], dataset.shape[2]) if patch_size is None else patch_size
 
         # build all patches
-        dataset = self.data_loader()
-        n_images = dataset.images.shape[0]
         patches_list = []
-        for idx in range(n_images):
-            for patch in extract_all_patches(dataset.images[idx], patch_size):
+        for idx in range(dataset.shape[0]):
+            for patch in extract_all_patches(dataset[idx], self.patch_size):
                 patches_list.append(patch)
 
-        # randomly choose patches
-        self.data = np.zeros((patch_size**2, n_patches))
-        chosen_patches_idx = np.random.choice(len(patches_list), n_patches, replace=False)
-        for patch_idx in range(n_patches):
-            self.data[:,patch_idx] = patches_list[chosen_patches_idx[patch_idx]]
+        # randomly select patches
+        self.n_patches = len(patches_list) if n_patches is None else n_patches
+        self.data = np.zeros((self.patch_size**2, self.n_patches))
+        if n_patches is None:
+            for patch_idx in range(self.n_patches):
+                self.data[:,patch_idx] = patches_list[patch_idx]
+        else:
+            chosen_patches_idx = np.random.choice(len(patches_list), self.n_patches, replace=False)
+            for patch_idx in range(self.n_patches):
+                self.data[:,patch_idx] = patches_list[chosen_patches_idx[patch_idx]]
 
-        print(f"Patch dataset {self.dataset_name.upper()} created with n_patches={n_patches} and patch_size={patch_size}.")
+        end_time = time()
+
+        print(f"Patch dataset {self.dataset_name.upper()} created with n_patches={self.n_patches} and patch_size={self.patch_size} (in {end_time-start_time:.2f}s).")
 
         if return_data:
             return self.data
@@ -309,6 +371,12 @@ if __name__ == "__main__":
     data_engine.create_patch_dataset(patch_size=8, n_patches=1000, return_data=False)
     data_engine.plot_random_patches(save=True)
     data_engine.plot_collection(n=500, nrow_plot=10, sort_variance=True, save=True)
+
+    # MNIST patch dataset (black and white handwritten digits)
+    data_engine = PatchDataGenerator(dataset_name="mnist")
+    data_engine.create_patch_dataset(patch_size=None, n_patches=None, return_data=False)
+    data_engine.plot_random_patches(save=True)
+    data_engine.plot_collection(n=400, nrow_plot=20, sort_variance=True, save=True)
 
     # Haar dictionary (don't normalize atoms for visualization purpose)
     haar_dict = PatchDictionary(
