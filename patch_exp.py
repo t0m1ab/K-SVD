@@ -51,8 +51,8 @@ class KSVDProcessor():
 
         # generate patches from the dataset
         self.data = self.data_engine.create_patch_dataset(n_patches=n_patches, patch_size=patch_size, return_data=True)
-        self.n_patches = n_patches
-        self.patch_size = patch_size
+        self.n_patches = self.data.shape[1]
+        self.patch_size = int(np.sqrt(self.data.shape[0]))
 
         if return_data:
             return self.data
