@@ -227,15 +227,15 @@ def main():
     # GENERATE TRAINNG PATCHES
     processor.generate_train_patches(
         dataset_name=dataset_name,
-        n_patches = 11_000,
-        patch_size = 8,
+        n_patches=11_000,
+        patch_size=8,
         return_data=False,
     )
 
     # LEARN KSVD DICTIONARY
     ksvd_dict = processor.train_dictionary(
-        n_atoms=441, # from scratch
-        # checkpoint=os.path.join(save_dir, f"{dict_name}/{dict_name}.npy"), # from checkpoint
+        n_atoms=441, # from scratch (441 or 100)
+        # checkpoint=os.path.join(save_dir, "dct_dict.npy"), # from checkpoint
         sparsity=10,
         max_iter=50,
         pursuit_method=OrthogonalMatchingPursuit,

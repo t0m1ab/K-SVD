@@ -144,7 +144,7 @@ class PatchDataGenerator:
 
         end_time = time()
 
-        print(f"Patch dataset {self.dataset_name.upper()} created with n_patches={self.n_patches} and patch_size={self.patch_size} (in {end_time-start_time:.2f}s).")
+        print(f"Patch dataset {self.dataset_name.upper()} created with n_patches={self.n_patches} and patch_size={self.patch_size} [{end_time-start_time:.2f}s]")
 
         if return_data:
             return self.data

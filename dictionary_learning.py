@@ -1,6 +1,7 @@
 import os
 import numpy as np
 from pathlib import Path
+from time import time
 
 from pursuits import Pursuit, SklearnOrthogonalMatchingPursuit, OrthogonalMatchingPursuit
 
@@ -92,6 +93,7 @@ class KSVD:
         stopping_criterion = False
         self.iteration = 0
         while not stopping_criterion:
+            start_time = time()
 
             # sparse coding stage
             pursuit_algo = self.pursuit_method(dict=self.dict, sparsity=self.sparsity, verbose=False)
@@ -124,7 +126,7 @@ class KSVD:
 
             if self.verbose:
                 total_iter = f"/{max_iter}" if max_iter is not None else ""
-                print(f"# Iter {self.iteration}{total_iter} | loss = {residual}")
+                print(f"# Iter {self.iteration}{total_iter} | loss = {residual} [{time() - start_time:.2f}s]")
             
             if save_chekpoints and (self.iteration%checkpoint_steps == 0):
                 checkpoint_name = f"{self.dict_name}_iter={self.iteration}.npy"
