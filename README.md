@@ -17,7 +17,7 @@
 
 * `patch_data.py`: create overcomplete DCT, Haar and K-SVD dictionaries used to reconstruct images
 * `patch_exp.py`: learn an overcomplete dictionary with K-SVD
-* `missing_values.py`: run missing values experiments using DCT, Haar or K-SVD dictionary
+* `reconstruction.py`: run missing values experiments using DCT, Haar or K-SVD dictionary
 * `examples/`: contains example images to run the missing values experiments
 
 ![patches_collection](figures/olivetti_collection_n=500.png)
