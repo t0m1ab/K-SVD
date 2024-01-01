@@ -538,8 +538,8 @@ def main(image_name: str = "lena", save_all_images: bool = True):
         sparsity=10,
         custom_dicts={
             "ksvd_olivetti": "./outputs/ksvd_olivetti/ksvd_olivetti.npy",
-            # "ksvd_olivetti_init-dct": "./outputs/ksvd_olivetti_init-dct/ksvd_olivetti_init-dct.npy",
-            # "ksvd_olivetti_init-haar": "./outputs/ksvd_olivetti_init-haar/ksvd_olivetti_init-haar.npy",
+            "ksvd_olivetti_dct": "./outputs/ksvd_olivetti_dct/ksvd_olivetti_dct.npy",
+            "ksvd_olivetti_haar": "./outputs/ksvd_olivetti_haar/ksvd_olivetti_haar.npy",
         },
         verbose=True,
     )
@@ -578,4 +578,4 @@ def main(image_name: str = "lena", save_all_images: bool = True):
 
 
 if __name__ == "__main__":
-    main(image_name="lena") # AVAILABLE IMAGES: shannon - keogh - lena
+    main(image_name="shannon") # AVAILABLE IMAGES: shannon - karpathy - lena
