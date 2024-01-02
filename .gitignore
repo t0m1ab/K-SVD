@@ -10,5 +10,5 @@ ArticularyWordRecognition/*
 *.pdf
 *.csv
 *.zip
-sandbox.ipynb
+*.ipynb
 trash.py
