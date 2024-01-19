@@ -4,10 +4,7 @@ __pycache__/*
 
 images/*
 outputs/*
-experiments/*
-ArticularyWordRecognition/*
-12/*
-*.pdf
+KSVD.pdf
 *.csv
 *.zip
 *.ipynb
